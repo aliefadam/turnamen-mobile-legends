@@ -4,7 +4,8 @@
 const WA_BASE = "https://wa-gateway.dokterkoding.my.id";
 
 // WhatsApp group (JID) that receives new-registration notifications.
-const GROUP_JID = "120363419728601551@g.us";
+// const GROUP_JID = "120363419728601551@g.us";
+const GROUP_JID = "6281231698288-1554293243@g.us";
 // Group invite link included in the confirmation message to team leaders.
 const GROUP_LINK = "https://chat.whatsapp.com/IAjuCcFrVxX6FyXlA5J2Lc?mode=gi_t";
 
