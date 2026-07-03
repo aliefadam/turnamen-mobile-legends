@@ -18,8 +18,8 @@ const seeds: Seed[] = [
     role: "admin",
   },
   {
-    email: "admin@alief.com",
-    password: "08819025672",
+    email: "superadmin@warkopsippo.com",
+    password: "210703",
     name: "Super Admin",
     role: "superadmin",
   },
@@ -29,7 +29,15 @@ async function main() {
   const { db, pool } = await import("./index");
   const { admins } = await import("./schema");
   const { hashPassword } = await import("../lib/password");
-  const { eq } = await import("drizzle-orm");
+  const { eq, notInArray } = await import("drizzle-orm");
+
+  // Remove any admin accounts that are no longer in the seed list.
+  const keepEmails = seeds.map((s) => s.email.trim().toLowerCase());
+  const removed = await db
+    .delete(admins)
+    .where(notInArray(admins.email, keepEmails))
+    .returning({ email: admins.email });
+  removed.forEach((r) => console.log(`✗ ${r.email} — dihapus (tidak di seed).`));
 
   for (const s of seeds) {
     const email = s.email.trim().toLowerCase();
