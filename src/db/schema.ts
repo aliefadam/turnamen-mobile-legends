@@ -60,3 +60,22 @@ export const admins = pgTable("admins", {
 
 export type Admin = typeof admins.$inferSelect;
 export type NewAdmin = typeof admins.$inferInsert;
+
+// Single-elimination bracket matches (one active bracket).
+export const bracketMatches = pgTable("bracket_matches", {
+  id: serial("id").primaryKey(),
+  round: integer("round").notNull(), // 1 = first round
+  slot: integer("slot").notNull(), // 0-based index within the round
+  team1Id: integer("team1_id"),
+  team2Id: integer("team2_id"),
+  team1Name: varchar("team1_name", { length: 100 }),
+  team2Name: varchar("team2_name", { length: 100 }),
+  score1: integer("score1").notNull().default(0),
+  score2: integer("score2").notNull().default(0),
+  bestOf: integer("best_of").notNull().default(1),
+  winnerSlot: integer("winner_slot"), // 1 or 2 (null = undecided)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type BracketMatch = typeof bracketMatches.$inferSelect;
+export type NewBracketMatch = typeof bracketMatches.$inferInsert;

@@ -71,9 +71,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Check total registrations (max slots)
-    const totalSlots = await db.select({ total: count() }).from(registrations);
-    const total = Number(totalSlots[0]?.total ?? 0);
-    if (total >= 100) {
+    const totalSlots = await db
+      .select({ slot: registrations.slot })
+      .from(registrations);
+    const total = totalSlots.reduce(
+      (sum, row) => sum + Math.max(1, Number(row.slot ?? 1)),
+      0
+    );
+    if (total + data.slot > 100) {
       return NextResponse.json(
         { success: false, message: "Slot pendaftaran sudah penuh." },
         { status: 400 }
@@ -152,9 +157,13 @@ export async function POST(req: NextRequest) {
 export async function GET() {
   try {
     const data = await db
-      .select({ count: count() })
+      .select({ slot: registrations.slot })
       .from(registrations);
-    return NextResponse.json({ success: true, total: Number(data[0]?.count ?? 0) });
+    const total = data.reduce(
+      (sum, row) => sum + Math.max(1, Number(row.slot ?? 1)),
+      0
+    );
+    return NextResponse.json({ success: true, total });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ success: false, total: 0 }, { status: 500 });
