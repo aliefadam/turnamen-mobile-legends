@@ -3,7 +3,8 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
+import AppToaster from "@/components/AppToaster";
 
 function LoginForm() {
   const router = useRouter();
@@ -94,10 +95,14 @@ function LoginForm() {
               <button
                 type="button"
                 onClick={() => setShowPassword((s) => !s)}
-                aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                aria-label={
+                  showPassword ? "Sembunyikan password" : "Tampilkan password"
+                }
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 transition-colors"
               >
-                <i className={`fi ${showPassword ? "fi-rr-eye-crossed" : "fi-rr-eye"}`} />
+                <i
+                  className={`fi ${showPassword ? "fi-rr-eye-crossed" : "fi-rr-eye"}`}
+                />
               </button>
             </div>
           </div>
@@ -111,9 +116,24 @@ function LoginForm() {
           >
             {loading ? (
               <>
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                <svg
+                  className="animate-spin h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
                 </svg>
                 Memproses...
               </>
@@ -124,14 +144,6 @@ function LoginForm() {
               </>
             )}
           </motion.button>
-
-          {/* Demo credentials hint (temporary) */}
-          <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-center">
-            <p className="text-xs text-amber-700 font-medium flex items-center justify-center gap-1.5">
-              <i className="fi fi-rr-info" />
-              Demo — admin@example.com / 123123
-            </p>
-          </div>
         </form>
       </div>
 
@@ -145,7 +157,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-orange-50 via-amber-50/60 to-white flex items-center justify-center px-4 py-12">
-      <Toaster position="top-center" />
+      <AppToaster />
       <Suspense fallback={<div className="text-gray-400 text-sm">Memuat…</div>}>
         <LoginForm />
       </Suspense>

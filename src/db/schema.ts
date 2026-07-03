@@ -37,8 +37,26 @@ export const registrations = pgTable("registrations", {
   sub2MlId: varchar("sub2_ml_id", { length: 50 }),
   sub2Server: varchar("sub2_server", { length: 50 }),
   slot: integer("slot").notNull().default(1),
+  // Storage object path of the uploaded payment proof (Supabase Storage)
+  paymentProofPath: text("payment_proof_path"),
+  // Registration status: "pending" | "confirmed"
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export type Registration = typeof registrations.$inferSelect;
 export type NewRegistration = typeof registrations.$inferInsert;
+
+// Admin accounts for the admin panel login
+export const admins = pgTable("admins", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  name: varchar("name", { length: 100 }),
+  // Access level: "admin" | "superadmin"
+  role: varchar("role", { length: 20 }).notNull().default("admin"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Admin = typeof admins.$inferSelect;
+export type NewAdmin = typeof admins.$inferInsert;

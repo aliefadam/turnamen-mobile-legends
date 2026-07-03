@@ -3,14 +3,25 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
+import AppToaster from "@/components/AppToaster";
+import TopLoader from "@/components/admin/TopLoader";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: "fi-rr-dashboard", exact: true },
   { href: "/admin/peserta", label: "Daftar Peserta", icon: "fi-rr-users" },
+  { href: "/admin/bracket", label: "Bracket", icon: "fi-rr-sitemap" },
 ];
 
-export default function AdminShell({ children }: { children: React.ReactNode }) {
+type AdminInfo = { email: string; name: string | null; role: "admin" | "superadmin" } | null;
+
+export default function AdminShell({
+  children,
+  admin,
+}: {
+  children: React.ReactNode;
+  admin?: AdminInfo;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -86,7 +97,8 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Toaster position="top-center" />
+      <TopLoader />
+      <AppToaster />
 
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-64 bg-white border-r border-gray-100 flex-col">
@@ -121,12 +133,17 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             {navItems.find((n) => isActive(n.href, n.exact))?.label ?? "Admin"}
           </h1>
           <div className="ml-auto flex items-center gap-2.5">
+            {admin && <RoleBadge role={admin.role} />}
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white">
               <i className="fi fi-rr-user text-sm" />
             </div>
             <div className="hidden sm:block leading-tight">
-              <p className="text-sm font-semibold text-gray-800">Admin</p>
-              <p className="text-[11px] text-gray-400">admin@example.com</p>
+              <p className="text-sm font-semibold text-gray-800">
+                {admin?.name || "Admin"}
+              </p>
+              <p className="text-[11px] text-gray-400">
+                {admin?.email || "-"}
+              </p>
             </div>
           </div>
         </header>
@@ -134,5 +151,21 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         <main className="p-4 sm:p-6 max-w-6xl mx-auto">{children}</main>
       </div>
     </div>
+  );
+}
+
+function RoleBadge({ role }: { role: "admin" | "superadmin" }) {
+  const isSuper = role === "superadmin";
+  return (
+    <span
+      className={`hidden sm:inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full
+        ${isSuper
+          ? "bg-amber-100 text-amber-700"
+          : "bg-gray-100 text-gray-500"
+        }`}
+    >
+      <i className={`fi ${isSuper ? "fi-rr-crown" : "fi-rr-shield"}`} />
+      {isSuper ? "Super Admin" : "Admin"}
+    </span>
   );
 }

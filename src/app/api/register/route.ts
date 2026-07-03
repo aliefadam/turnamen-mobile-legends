@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { registrations } from "@/db/schema";
 import { z } from "zod";
-import { count, eq } from "drizzle-orm";
+import { count, sql } from "drizzle-orm";
 
 const playerSchema = z.object({
   name: z.string().min(1, "Nama pemain wajib diisi"),
@@ -30,7 +30,21 @@ const registrationSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    // Accept multipart/form-data (payload JSON + optional proof file) or plain JSON.
+    let body: unknown;
+    let proofFile: File | null = null;
+
+    const contentType = req.headers.get("content-type") || "";
+    if (contentType.includes("multipart/form-data")) {
+      const form = await req.formData();
+      const payload = form.get("payload");
+      body = typeof payload === "string" ? JSON.parse(payload) : {};
+      const proof = form.get("proof");
+      if (proof instanceof File && proof.size > 0) proofFile = proof;
+    } else {
+      body = await req.json();
+    }
+
     const parsed = registrationSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -42,11 +56,11 @@ export async function POST(req: NextRequest) {
 
     const data = parsed.data;
 
-    // Check slot availability for this team name
+    // Check team name uniqueness (case-insensitive)
     const existing = await db
       .select({ count: count() })
       .from(registrations)
-      .where(eq(registrations.teamName, data.teamName));
+      .where(sql`lower(${registrations.teamName}) = lower(${data.teamName})`);
 
     const existingCount = existing[0]?.count ?? 0;
     if (Number(existingCount) > 0) {
@@ -70,9 +84,18 @@ export async function POST(req: NextRequest) {
     const sub1 = subs[0];
     const sub2 = subs[1];
 
+    // Upload payment proof to Supabase Storage (no-op if storage not configured).
+    let paymentProofPath: string | null = null;
+    if (proofFile) {
+      const { uploadPaymentProof } = await import("@/lib/supabase");
+      paymentProofPath = await uploadPaymentProof(proofFile, data.teamName);
+    }
+
     const newReg = await db
       .insert(registrations)
       .values({
+        paymentProofPath,
+        status: "pending",
         teamName: data.teamName,
         leaderName: data.leaderName,
         leaderWhatsapp: data.leaderWhatsapp,
@@ -100,6 +123,18 @@ export async function POST(req: NextRequest) {
         sub2Server: sub2?.server || null,
       })
       .returning();
+
+    // Notify admin via WhatsApp (best-effort — never blocks/breaks registration).
+    try {
+      const { notifyGroupNewRegistration } = await import("@/lib/whatsapp");
+      await notifyGroupNewRegistration(
+        newReg[0].teamName,
+        newReg[0].slot,
+        newReg[0].createdAt
+      );
+    } catch (waError) {
+      console.error("WA notify (register) failed:", waError);
+    }
 
     return NextResponse.json(
       { success: true, message: "Pendaftaran berhasil!", data: newReg[0] },

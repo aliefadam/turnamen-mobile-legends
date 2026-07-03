@@ -1,10 +1,13 @@
 import { getAllRegistrations } from "@/lib/registrations";
+import { getAdminInfo } from "@/lib/admin-session";
 import PesertaTable from "@/components/admin/PesertaTable";
 
 export const dynamic = "force-dynamic";
 
 export default async function PesertaPage() {
   const { data, dbError } = await getAllRegistrations();
+  const admin = await getAdminInfo();
+  const isSuperadmin = admin?.role === "superadmin";
 
   return (
     <div className="space-y-6">
@@ -24,7 +27,7 @@ export default async function PesertaPage() {
         </div>
       )}
 
-      <PesertaTable data={data} />
+      <PesertaTable data={data} isSuperadmin={isSuperadmin} />
     </div>
   );
 }

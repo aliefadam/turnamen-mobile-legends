@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import toast from "react-hot-toast";
+import { downloadProofImage } from "@/lib/proof-image";
 
 const playerSchema = z.object({
   name: z.string().min(1, "Wajib diisi"),
@@ -42,6 +43,9 @@ export default function RegistrationForm() {
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [teamStatus, setTeamStatus] = useState<
+    "idle" | "checking" | "available" | "taken"
+  >("idle");
 
   const handleProofChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -81,6 +85,7 @@ export default function RegistrationForm() {
     formState: { errors },
     trigger,
     watch,
+    setValue,
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -110,6 +115,37 @@ export default function RegistrationForm() {
   const subFields = [0, 1];
 
   const watchAll = watch();
+  const teamName = watchAll.teamName;
+
+  // Realtime team-name availability check (debounced).
+  useEffect(() => {
+    const name = (teamName ?? "").trim();
+    if (name.length < 2) {
+      setTeamStatus("idle");
+      return;
+    }
+    setTeamStatus("checking");
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/register/check-team?name=${encodeURIComponent(name)}`,
+          { signal: controller.signal }
+        );
+        const json = await res.json();
+        if (json.available === true) setTeamStatus("available");
+        else if (json.available === false) setTeamStatus("taken");
+        else setTeamStatus("idle");
+      } catch {
+        if (!controller.signal.aborted) setTeamStatus("idle");
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [teamName]);
 
   const nextStep = async () => {
     let fields: (keyof FormData)[] = [];
@@ -118,7 +154,15 @@ export default function RegistrationForm() {
     if (step === 1) fields = ["players"];
 
     const valid = await trigger(fields);
-    if (valid) setStep((s) => s + 1);
+    if (!valid) return;
+
+    // Block advancing if the team name is already taken.
+    if (step === 0 && teamStatus === "taken") {
+      toast.error("Nama tim sudah dipakai. Gunakan nama lain.");
+      return;
+    }
+
+    setStep((s) => s + 1);
   };
 
   const prevStep = () => setStep((s) => s - 1);
@@ -126,10 +170,13 @@ export default function RegistrationForm() {
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
     try {
+      const formData = new FormData();
+      formData.append("payload", JSON.stringify(data));
+      if (proofFile) formData.append("proof", proofFile);
+
       const res = await fetch("/api/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: formData,
       });
       const json = await res.json();
 
@@ -147,7 +194,7 @@ export default function RegistrationForm() {
   };
 
   if (success) {
-    return <SuccessScreen teamName={watchAll.teamName} slot={watchAll.slot} />;
+    return <SuccessScreen data={watchAll} />;
   }
 
   return (
@@ -233,16 +280,46 @@ export default function RegistrationForm() {
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                       Nama Tim <span className="text-orange-500">*</span>
                     </label>
-                    <input
-                      {...register("teamName")}
-                      placeholder="Contoh: Team Alpha"
-                      className="input-field w-full px-4 py-3 rounded-xl bg-gray-50 text-gray-800 placeholder-gray-400 text-sm font-medium"
-                    />
-                    {errors.teamName && (
+                    <div className="relative">
+                      <input
+                        {...register("teamName")}
+                        placeholder="Contoh: Team Alpha"
+                        className={`input-field w-full px-4 py-3 pr-11 rounded-xl bg-gray-50 text-gray-800 placeholder-gray-400 text-sm font-medium
+                          ${teamStatus === "taken" ? "border-red-300! focus:border-red-400!" : ""}
+                          ${teamStatus === "available" ? "border-green-300! focus:border-green-400!" : ""}`}
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2">
+                        {teamStatus === "checking" && (
+                          <svg className="animate-spin h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                        )}
+                        {teamStatus === "available" && (
+                          <i className="fi fi-rr-check-circle text-green-500" />
+                        )}
+                        {teamStatus === "taken" && (
+                          <i className="fi fi-rr-cross-circle text-red-500" />
+                        )}
+                      </span>
+                    </div>
+                    {errors.teamName ? (
                       <p className="text-red-500 text-xs mt-1">
                         {errors.teamName.message}
                       </p>
-                    )}
+                    ) : teamStatus === "checking" ? (
+                      <p className="text-gray-400 text-xs mt-1">Memeriksa ketersediaan nama...</p>
+                    ) : teamStatus === "available" ? (
+                      <p className="text-green-600 text-xs mt-1 flex items-center gap-1">
+                        <i className="fi fi-rr-check" />
+                        Nama tim tersedia
+                      </p>
+                    ) : teamStatus === "taken" ? (
+                      <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                        <i className="fi fi-rr-exclamation" />
+                        Nama tim sudah dipakai, gunakan nama lain
+                      </p>
+                    ) : null}
                   </div>
 
                   <div>
@@ -291,21 +368,23 @@ export default function RegistrationForm() {
                     </p>
                     <div className="grid grid-cols-2 gap-3">
                       {[1, 2].map((n) => (
-                        <label
+                        <button
+                          type="button"
                           key={n}
-                          className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200
+                          onClick={() =>
+                            setValue("slot", n, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            })
+                          }
+                          aria-pressed={watchAll.slot === n}
+                          className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300
                             ${
                               watchAll.slot === n
                                 ? "border-orange-400 bg-orange-50"
                                 : "border-gray-200 hover:border-orange-200"
                             }`}
                         >
-                          <input
-                            type="radio"
-                            value={n}
-                            {...register("slot", { valueAsNumber: true })}
-                            className="sr-only"
-                          />
                           <span
                             className={`w-11 h-11 rounded-xl flex items-center justify-center text-lg font-black transition-colors
                               ${watchAll.slot === n ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-500"}`}
@@ -323,7 +402,7 @@ export default function RegistrationForm() {
                               <i className="fi fi-rr-check text-white text-[10px]" />
                             </div>
                           )}
-                        </label>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -340,6 +419,16 @@ export default function RegistrationForm() {
                   transition={{ duration: 0.3 }}
                   className="space-y-6"
                 >
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-2.5">
+                    <i className="fi fi-rr-address-card text-blue-500 text-base mt-0.5" />
+                    <p className="text-sm text-blue-700 font-medium">
+                      Kolom nama diisi{" "}
+                      <span className="font-bold">
+                        nama lengkap sesuai kartu identitas (KTP)
+                      </span>
+                      , bukan nickname Mobile Legends.
+                    </p>
+                  </div>
                   {playerFields.map((pi) => (
                     <PlayerCard
                       key={pi}
@@ -363,11 +452,21 @@ export default function RegistrationForm() {
                   transition={{ duration: 0.3 }}
                   className="space-y-6"
                 >
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-2 flex items-start gap-2.5">
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-2.5">
                     <i className="fi fi-rr-bulb text-amber-500 text-base mt-0.5" />
                     <p className="text-sm text-amber-700 font-medium">
                       Pemain cadangan bersifat opsional. Kamu bisa mengosongkan
                       bagian ini.
+                    </p>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-2.5">
+                    <i className="fi fi-rr-address-card text-blue-500 text-base mt-0.5" />
+                    <p className="text-sm text-blue-700 font-medium">
+                      Kolom nama diisi{" "}
+                      <span className="font-bold">
+                        nama lengkap sesuai kartu identitas (KTP)
+                      </span>
+                      , bukan nickname Mobile Legends.
                     </p>
                   </div>
                   {subFields.map((si) => (
@@ -652,12 +751,12 @@ function PlayerCard({
       <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 bg-gray-50/50">
         <div>
           <label className="block text-xs font-semibold text-gray-500 mb-1">
-            Nama Lengkap{" "}
+            Nama Lengkap (KTP){" "}
             {!optional && <span className="text-orange-500">*</span>}
           </label>
           <input
             {...register(`${prefix}.name`)}
-            placeholder="Nama lengkap"
+            placeholder="Nama lengkap sesuai KTP"
             className="input-field w-full px-3 py-2.5 rounded-lg bg-white text-gray-800 placeholder-gray-400 text-sm"
           />
           {errors?.name && (
@@ -791,7 +890,22 @@ function LoadingSpinner() {
 }
 
 // Success Screen
-function SuccessScreen({ teamName, slot }: { teamName: string; slot: number }) {
+function SuccessScreen({ data }: { data: FormData }) {
+  const { teamName, slot } = data;
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      await downloadProofImage(data);
+      toast.success("Bukti pendaftaran berhasil diunduh");
+    } catch {
+      toast.error("Gagal membuat bukti pendaftaran");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
@@ -843,23 +957,44 @@ function SuccessScreen({ teamName, slot }: { teamName: string; slot: number }) {
             <ul className="text-xs text-amber-700 space-y-2.5">
               <li className="flex items-start gap-2">
                 <i className="fi fi-rr-picture text-amber-500 mt-0.5" />
-                Screenshot halaman ini sebagai bukti
-              </li>
-              <li className="flex items-start gap-2">
-                <i className="fi fi-rr-coins text-amber-500 mt-0.5" />
-                Lakukan pembayaran entry fee (Rp{" "}
-                {slot === 1 ? "50.000" : "100.000"})
+                Tekan tombol download bukti pendaftaran dibawah
               </li>
               <li className="flex items-start gap-2">
                 <i className="fi fi-brands-whatsapp text-amber-500 mt-0.5" />
-                Konfirmasi ke WA 0895364711840 (Alief)
+                Konfirmasi dan kirimkan bukti tersebut ke WA 0895364711840
+                (Alief)
               </li>
               <li className="flex items-start gap-2">
                 <i className="fi fi-rr-gamepad text-amber-500 mt-0.5" />
-                Hadir tepat waktu pada hari turnamen!
+                Lalu anda akan diberikan link group WhatsApp untuk info lebih
+                lanjut
               </li>
             </ul>
           </motion.div>
+
+          <motion.button
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.65 }}
+            type="button"
+            onClick={handleDownload}
+            disabled={downloading}
+            whileHover={!downloading ? { scale: 1.02 } : {}}
+            whileTap={!downloading ? { scale: 0.97 } : {}}
+            className="w-full mb-6 px-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-white font-bold text-sm shadow-md shadow-orange-200 disabled:opacity-60 disabled:cursor-not-allowed btn-press flex items-center justify-center gap-2"
+          >
+            {downloading ? (
+              <>
+                <LoadingSpinner />
+                Membuat bukti...
+              </>
+            ) : (
+              <>
+                <i className="fi fi-rr-download text-base" />
+                Unduh Bukti Pendaftaran
+              </>
+            )}
+          </motion.button>
 
           <motion.div
             initial={{ opacity: 0, y: 10 }}
