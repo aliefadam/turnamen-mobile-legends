@@ -1,4 +1,5 @@
 import type { BracketMatch } from "@/db/schema";
+import { getActiveSeason } from "./seasons";
 
 // ---------- Types exposed to the UI ----------
 export type BracketRound = {
@@ -84,28 +85,87 @@ function buildSeededEntries(
   size: number,
   order: number[]
 ): Array<Entrant | null> {
-  const pool = shuffle(entrants);
   const matches = Array.from({ length: size / 2 }, () => ({
     team1: null as Entrant | null,
     team2: null as Entrant | null,
   }));
+  const half = Math.max(1, matches.length / 2);
+  const topSlots = Array.from({ length: half }, (_, i) => i);
+  const bottomSlots = Array.from(
+    { length: matches.length - half },
+    (_, i) => i + half
+  );
 
-  for (let i = 0; i < matches.length && pool.length > 0; i++) {
-    matches[i].team1 = pool.shift() ?? null;
+  const byRegistration = new Map<number, Entrant[]>();
+  for (const entrant of shuffle(entrants)) {
+    const list = byRegistration.get(entrant.registrationId) ?? [];
+    list.push(entrant);
+    byRegistration.set(entrant.registrationId, list);
   }
 
-  while (pool.length > 0) {
-    const entrant = pool.shift()!;
-    const preferred = matches.filter(
+  const groups = shuffle(Array.from(byRegistration.values()));
+
+  const placeEntrant = (entrant: Entrant, preferredSlots: number[]) => {
+    const preferredMatches = preferredSlots.map((slot) => matches[slot]).filter(Boolean);
+
+    const team1Preferred = preferredMatches.filter((m) => m.team1 == null);
+    if (team1Preferred.length > 0) {
+      team1Preferred[Math.floor(Math.random() * team1Preferred.length)].team1 = entrant;
+      return;
+    }
+
+    const team2Preferred = preferredMatches.filter(
       (m) =>
         m.team2 == null &&
         m.team1 != null &&
         m.team1.registrationId !== entrant.registrationId
     );
+    if (team2Preferred.length > 0) {
+      team2Preferred[Math.floor(Math.random() * team2Preferred.length)].team2 = entrant;
+      return;
+    }
+
+    const allTeam1 = matches.filter((m) => m.team1 == null);
+    if (allTeam1.length > 0) {
+      allTeam1[Math.floor(Math.random() * allTeam1.length)].team1 = entrant;
+      return;
+    }
+
+    const allTeam2 = matches.filter(
+      (m) =>
+        m.team2 == null &&
+        m.team1 != null &&
+        m.team1.registrationId !== entrant.registrationId
+    );
+    if (allTeam2.length > 0) {
+      allTeam2[Math.floor(Math.random() * allTeam2.length)].team2 = entrant;
+      return;
+    }
+
     const fallback = matches.filter((m) => m.team2 == null);
-    const bucket = preferred.length > 0 ? preferred : fallback;
-    const target = bucket[Math.floor(Math.random() * bucket.length)];
-    target.team2 = entrant;
+    if (fallback.length > 0) {
+      fallback[Math.floor(Math.random() * fallback.length)].team2 = entrant;
+    }
+  };
+
+  const singles: Entrant[] = [];
+
+  for (const group of groups) {
+    if (group.length <= 1) {
+      singles.push(...group);
+      continue;
+    }
+
+    const halfOrder = Math.random() < 0.5 ? [topSlots, bottomSlots] : [bottomSlots, topSlots];
+    group.forEach((entrant, index) => {
+      const preferred = halfOrder[index % halfOrder.length];
+      placeEntrant(entrant, preferred);
+    });
+  }
+
+  for (const entrant of shuffle(singles)) {
+    const preferred = Math.random() < 0.5 ? topSlots : bottomSlots;
+    placeEntrant(entrant, preferred);
   }
 
   const seeded: Array<Entrant | null> = Array(size).fill(null);
@@ -133,6 +193,7 @@ type M = {
   team2Id: number | null;
   team1Name: string | null;
   team2Name: string | null;
+  played: boolean;
   score1: number;
   score2: number;
   bestOf: number;
@@ -203,6 +264,7 @@ function recompute(matches: M[]): M[] {
           parent.team2Name = newName;
         }
         // Incoming team changed → invalidate this parent's result.
+        parent.played = false;
         parent.score1 = 0;
         parent.score2 = 0;
         parent.winnerSlot = null;
@@ -227,12 +289,16 @@ function recompute(matches: M[]): M[] {
 
 // ---------- DB access ----------
 async function loadMatches(): Promise<M[]> {
+  const season = await getActiveSeason();
+  if (!season) return [];
+
   const { db } = await import("@/db");
   const { bracketMatches } = await import("@/db/schema");
-  const { asc } = await import("drizzle-orm");
+  const { asc, eq } = await import("drizzle-orm");
   const rows = await db
     .select()
     .from(bracketMatches)
+    .where(eq(bracketMatches.seasonId, season.id))
     .orderBy(asc(bracketMatches.round), asc(bracketMatches.slot));
   return rows as M[];
 }
@@ -249,6 +315,7 @@ async function persist(matches: M[]): Promise<void> {
         team2Id: m.team2Id,
         team1Name: m.team1Name,
         team2Name: m.team2Name,
+        played: m.played,
         score1: m.score1,
         score2: m.score2,
         bestOf: m.bestOf,
@@ -266,7 +333,7 @@ export async function getBracket(): Promise<BracketData> {
       return { exists: false, dbError: false, started: false, totalRounds: 0, rounds: [], champion: null };
     }
     const totalRounds = Math.max(...matches.map((m) => m.round));
-    const started = matches.some((m) => m.score1 > 0 || m.score2 > 0);
+    const started = matches.some((m) => m.played || m.score1 > 0 || m.score2 > 0);
 
     const rounds: BracketRound[] = [];
     for (let r = 1; r <= totalRounds; r++) {
@@ -311,9 +378,14 @@ export async function getBracket(): Promise<BracketData> {
 
 export async function generateBracket(): Promise<{ ok: boolean; message?: string }> {
   try {
+    const season = await getActiveSeason();
+    if (!season) {
+      return { ok: false, message: "Belum ada season aktif." };
+    }
+
     const { db } = await import("@/db");
     const { registrations, bracketMatches } = await import("@/db/schema");
-    const { eq, asc } = await import("drizzle-orm");
+    const { and, eq, asc } = await import("drizzle-orm");
 
     const teams = await db
       .select({
@@ -322,7 +394,12 @@ export async function generateBracket(): Promise<{ ok: boolean; message?: string
         slot: registrations.slot,
       })
       .from(registrations)
-      .where(eq(registrations.status, "confirmed"))
+      .where(
+        and(
+          eq(registrations.status, "confirmed"),
+          eq(registrations.seasonId, season.id)
+        )
+      )
       .orderBy(asc(registrations.createdAt));
 
     const entrants = expandBracketEntrants(teams);
@@ -343,7 +420,7 @@ export async function generateBracket(): Promise<{ ok: boolean; message?: string
     const seedToTeam = buildSeededEntries(entrants, size, order);
 
     // Wipe existing bracket.
-    await db.delete(bracketMatches);
+    await db.delete(bracketMatches).where(eq(bracketMatches.seasonId, season.id));
 
     // Build round 1 rows.
     const rows: {
@@ -378,7 +455,9 @@ export async function generateBracket(): Promise<{ ok: boolean; message?: string
       }
     }
 
-    await db.insert(bracketMatches).values(rows.map((r) => ({ ...r, bestOf: 1 })));
+    await db.insert(bracketMatches).values(
+      rows.map((r) => ({ ...r, seasonId: season.id, bestOf: 1 }))
+    );
 
     // Resolve byes → fill round 2, then persist.
     const matches = await loadMatches();
@@ -394,9 +473,13 @@ export async function generateBracket(): Promise<{ ok: boolean; message?: string
 
 export async function resetBracket(): Promise<{ ok: boolean }> {
   try {
+    const season = await getActiveSeason();
+    if (!season) return { ok: true };
+
     const { db } = await import("@/db");
     const { bracketMatches } = await import("@/db/schema");
-    await db.delete(bracketMatches);
+    const { eq } = await import("drizzle-orm");
+    await db.delete(bracketMatches).where(eq(bracketMatches.seasonId, season.id));
     return { ok: true };
   } catch (error) {
     console.error("resetBracket failed:", error);
@@ -415,6 +498,8 @@ export async function setMatchResult(
     if (!m) return { ok: false, message: "Match tidak ditemukan." };
     if (m.team1Name == null || m.team2Name == null)
       return { ok: false, message: "Kedua tim belum lengkap." };
+    if (!m.played)
+      return { ok: false, message: "Tandai pertandingan sudah bermain sebelum input skor." };
 
     const need = Math.ceil(m.bestOf / 2);
     const s1 = Math.trunc(score1);
@@ -434,6 +519,33 @@ export async function setMatchResult(
   } catch (error) {
     console.error("setMatchResult failed:", error);
     return { ok: false, message: "Gagal menyimpan hasil." };
+  }
+}
+
+export async function setMatchPlayed(
+  matchId: number,
+  played: boolean
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const matches = await loadMatches();
+    const m = matches.find((x) => x.id === matchId);
+    if (!m) return { ok: false, message: "Match tidak ditemukan." };
+    if (m.team1Name == null || m.team2Name == null)
+      return { ok: false, message: "Kedua tim belum lengkap." };
+
+    m.played = played;
+    if (!played) {
+      m.score1 = 0;
+      m.score2 = 0;
+      m.winnerSlot = null;
+    }
+
+    recompute(matches);
+    await persist(matches);
+    return { ok: true };
+  } catch (error) {
+    console.error("setMatchPlayed failed:", error);
+    return { ok: false, message: "Gagal memperbarui status pertandingan." };
   }
 }
 
@@ -487,14 +599,16 @@ export async function swapTeams(
 ): Promise<{ ok: boolean; message?: string }> {
   try {
     const matches = await loadMatches();
-    const started = matches.some((m) => m.score1 > 0 || m.score2 > 0);
+    const started = matches.some((m) => m.played || m.score1 > 0 || m.score2 > 0);
     if (started)
       return { ok: false, message: "Tidak bisa mengatur posisi setelah pertandingan dimulai." };
 
     const a = matches.find((m) => m.id === matchAId);
     const b = matches.find((m) => m.id === matchBId);
-    if (!a || !b || a.round !== 1 || b.round !== 1)
-      return { ok: false, message: "Hanya bisa menukar tim pada ronde pertama." };
+    if (!a || !b)
+      return { ok: false, message: "Posisi tim tidak ditemukan." };
+    if (a.round !== b.round)
+      return { ok: false, message: "Penukaran hanya bisa dilakukan dalam ronde yang sama." };
 
     const getTeam = (m: M, side: 1 | 2) =>
       side === 1
@@ -515,7 +629,21 @@ export async function swapTeams(
     setTeam(a, sideA, tb);
     setTeam(b, sideB, ta);
 
-    recompute(matches);
+    if (a.round === 1) {
+      recompute(matches);
+    } else {
+      for (const m of matches) {
+        if (m.round <= a.round) continue;
+        m.team1Id = null;
+        m.team2Id = null;
+        m.team1Name = null;
+        m.team2Name = null;
+        m.played = false;
+        m.score1 = 0;
+        m.score2 = 0;
+        m.winnerSlot = null;
+      }
+    }
     await persist(matches);
     return { ok: true };
   } catch (error) {

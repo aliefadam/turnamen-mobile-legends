@@ -2,7 +2,13 @@
 
 import { motion } from "framer-motion";
 
-export default function HeroSection() {
+export default function HeroSection({
+  seasonName,
+  registrationOpen,
+}: {
+  seasonName: string | null;
+  registrationOpen: boolean;
+}) {
   return (
     <section className="relative w-full overflow-hidden bg-white">
       {/* Background: light white + orange theme */}
@@ -24,11 +30,26 @@ export default function HeroSection() {
           transition={{ duration: 0.6 }}
           className="inline-flex items-center gap-2 bg-white border border-orange-100 shadow-sm rounded-full px-4 py-2 mb-6"
         >
-          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          <span
+            className={`w-2 h-2 rounded-full animate-pulse ${
+              registrationOpen ? "bg-green-500" : "bg-red-400"
+            }`}
+          />
           <span className="text-orange-600 text-xs font-semibold uppercase tracking-widest">
-            Pendaftaran Dibuka
+            {registrationOpen ? "Pendaftaran Dibuka" : "Pendaftaran Ditutup"}
           </span>
         </motion.div>
+
+        {seasonName && (
+          <motion.p
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.05 }}
+            className="text-sm font-bold text-orange-600 mb-3"
+          >
+            {seasonName}
+          </motion.p>
+        )}
 
         {/* Title */}
         <motion.h1

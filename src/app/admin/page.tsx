@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getRegistrationStats } from "@/lib/registrations";
+import { getActiveSeason } from "@/lib/seasons";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ function formatDate(d: Date | string) {
 }
 
 export default async function DashboardPage() {
-  const stats = await getRegistrationStats();
+  const [stats, season] = await Promise.all([getRegistrationStats(), getActiveSeason()]);
 
   const cards = [
     {
@@ -45,6 +46,29 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">
+            Season Aktif
+          </p>
+          <p className="text-2xl font-black text-gray-900">
+            {season?.name ?? "Belum ada season aktif"}
+          </p>
+          <p className="text-sm text-gray-500 mt-1">
+            {season
+              ? `Pendaftaran ${season.registrationOpen ? "dibuka" : "ditutup"} • Maks ${season.maxSlots} slot`
+              : "Aktifkan season agar form user dan admin sinkron."}
+          </p>
+        </div>
+        <Link
+          href="/admin/seasons"
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50"
+        >
+          <i className="fi fi-rr-layers" />
+          Kelola Season
+        </Link>
+      </div>
+
       {stats.dbError && (
         <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex items-start gap-2.5">
           <i className="fi fi-rr-exclamation text-red-500 mt-0.5" />

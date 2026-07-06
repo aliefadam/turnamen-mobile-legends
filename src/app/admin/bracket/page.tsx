@@ -1,5 +1,6 @@
 import { getBracket } from "@/lib/bracket";
 import { getAdminInfo } from "@/lib/admin-session";
+import { getActiveSeason } from "@/lib/seasons";
 import BracketManager from "@/components/admin/BracketManager";
 
 export const dynamic = "force-dynamic";
@@ -10,13 +11,21 @@ export const metadata = {
 
 async function confirmedCount(): Promise<number> {
   try {
+    const season = await getActiveSeason();
+    if (!season) return 0;
+
     const { db } = await import("@/db");
     const { registrations } = await import("@/db/schema");
-    const { eq } = await import("drizzle-orm");
+    const { and, eq } = await import("drizzle-orm");
     const r = await db
       .select({ slot: registrations.slot })
       .from(registrations)
-      .where(eq(registrations.status, "confirmed"));
+      .where(
+        and(
+          eq(registrations.status, "confirmed"),
+          eq(registrations.seasonId, season.id)
+        )
+      );
     return r.reduce((total, row) => total + Math.max(1, Number(row.slot ?? 1)), 0);
   } catch {
     return 0;

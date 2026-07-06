@@ -4,6 +4,7 @@ import { registrations } from "@/db/schema";
 import { z } from "zod";
 import { and, count, eq, ne, sql } from "drizzle-orm";
 import { getAdminInfo } from "@/lib/admin-session";
+import { getActiveSeason } from "@/lib/seasons";
 
 const playerSchema = z.object({
   name: z.string().min(1, "Nama pemain wajib diisi"),
@@ -53,6 +54,11 @@ export async function PUT(
   }
 
   try {
+    const season = await getActiveSeason();
+    if (!season) {
+      return NextResponse.json({ success: false, message: "Belum ada season aktif" }, { status: 400 });
+    }
+
     let body: unknown;
     let proofFile: File | null = null;
     const contentType = req.headers.get("content-type") || "";
@@ -79,7 +85,7 @@ export async function PUT(
     const current = await db
       .select()
       .from(registrations)
-      .where(eq(registrations.id, id))
+      .where(and(eq(registrations.id, id), eq(registrations.seasonId, season.id)))
       .limit(1);
     if (current.length === 0) {
       return NextResponse.json({ success: false, message: "Data tidak ditemukan" }, { status: 404 });
@@ -91,6 +97,7 @@ export async function PUT(
       .from(registrations)
       .where(
         and(
+          eq(registrations.seasonId, season.id),
           sql`lower(${registrations.teamName}) = lower(${data.teamName})`,
           ne(registrations.id, id)
         )
@@ -180,6 +187,11 @@ export async function PATCH(
   }
 
   try {
+    const season = await getActiveSeason();
+    if (!season) {
+      return NextResponse.json({ success: false, message: "Belum ada season aktif" }, { status: 400 });
+    }
+
     const parsed = statusSchema.safeParse(await req.json());
     if (!parsed.success) {
       return NextResponse.json({ success: false, message: "Status tidak valid" }, { status: 400 });
@@ -188,7 +200,7 @@ export async function PATCH(
     const updated = await db
       .update(registrations)
       .set({ status: parsed.data.status })
-      .where(eq(registrations.id, id))
+      .where(and(eq(registrations.id, id), eq(registrations.seasonId, season.id)))
       .returning({
         id: registrations.id,
         teamName: registrations.teamName,
@@ -235,9 +247,14 @@ export async function DELETE(
   }
 
   try {
+    const season = await getActiveSeason();
+    if (!season) {
+      return NextResponse.json({ success: false, message: "Belum ada season aktif" }, { status: 400 });
+    }
+
     const deleted = await db
       .delete(registrations)
-      .where(eq(registrations.id, id))
+      .where(and(eq(registrations.id, id), eq(registrations.seasonId, season.id)))
       .returning({ paymentProofPath: registrations.paymentProofPath });
 
     if (deleted.length === 0) {

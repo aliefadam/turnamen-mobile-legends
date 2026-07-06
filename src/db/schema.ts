@@ -6,10 +6,27 @@ import {
   timestamp,
   integer,
   boolean,
+  jsonb,
 } from "drizzle-orm/pg-core";
+
+export const seasons = pgTable("seasons", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  slug: varchar("slug", { length: 140 }).notNull().unique(),
+  isActive: boolean("is_active").notNull().default(false),
+  registrationOpen: boolean("registration_open").notNull().default(true),
+  maxSlots: integer("max_slots").notNull().default(100),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Season = typeof seasons.$inferSelect;
+export type NewSeason = typeof seasons.$inferInsert;
 
 export const registrations = pgTable("registrations", {
   id: serial("id").primaryKey(),
+  seasonId: integer("season_id").references(() => seasons.id, {
+    onDelete: "set null",
+  }),
   teamName: varchar("team_name", { length: 100 }).notNull(),
   leaderName: varchar("leader_name", { length: 100 }).notNull(),
   leaderWhatsapp: varchar("leader_whatsapp", { length: 20 }).notNull(),
@@ -41,6 +58,10 @@ export const registrations = pgTable("registrations", {
   paymentProofPath: text("payment_proof_path"),
   // Registration status: "pending" | "confirmed"
   status: varchar("status", { length: 20 }).notNull().default("pending"),
+  // Team-level attendance (all expected players present / marked present)
+  attended: boolean("attended").notNull().default(false),
+  // Per-player attendance, keyed p1..p5 / s1..s2 (null = none checked yet)
+  attendance: jsonb("attendance").$type<Record<string, boolean>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -64,12 +85,16 @@ export type NewAdmin = typeof admins.$inferInsert;
 // Single-elimination bracket matches (one active bracket).
 export const bracketMatches = pgTable("bracket_matches", {
   id: serial("id").primaryKey(),
+  seasonId: integer("season_id").references(() => seasons.id, {
+    onDelete: "set null",
+  }),
   round: integer("round").notNull(), // 1 = first round
   slot: integer("slot").notNull(), // 0-based index within the round
   team1Id: integer("team1_id"),
   team2Id: integer("team2_id"),
   team1Name: varchar("team1_name", { length: 100 }),
   team2Name: varchar("team2_name", { length: 100 }),
+  played: boolean("played").notNull().default(false),
   score1: integer("score1").notNull().default(0),
   score2: integer("score2").notNull().default(0),
   bestOf: integer("best_of").notNull().default(1),

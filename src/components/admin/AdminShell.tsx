@@ -11,6 +11,7 @@ const navItems = [
   { href: "/admin", label: "Dashboard", icon: "fi-rr-dashboard", exact: true },
   { href: "/admin/peserta", label: "Daftar Peserta", icon: "fi-rr-users" },
   { href: "/admin/bracket", label: "Bracket", icon: "fi-rr-sitemap" },
+  { href: "/admin/seasons", label: "Season", icon: "fi-rr-layers", superadminOnly: true },
 ];
 
 type AdminInfo = { email: string; name: string | null; role: "admin" | "superadmin" } | null;
@@ -61,7 +62,9 @@ export default function AdminShell({
         <p className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">
           Menu
         </p>
-        {navItems.map((item) => {
+        {navItems
+          .filter((item) => !item.superadminOnly || admin?.role === "superadmin")
+          .map((item) => {
           const active = isActive(item.href, item.exact);
           return (
             <Link

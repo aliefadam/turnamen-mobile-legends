@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { registrations } from "@/db/schema";
+import { getActiveSeason } from "@/lib/seasons";
 import { z } from "zod";
-import { count, sql } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 
 const playerSchema = z.object({
   name: z.string().min(1, "Nama pemain wajib diisi"),
@@ -30,6 +31,20 @@ const registrationSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const season = await getActiveSeason();
+    if (!season) {
+      return NextResponse.json(
+        { success: false, message: "Belum ada season aktif untuk pendaftaran." },
+        { status: 400 }
+      );
+    }
+    if (!season.registrationOpen) {
+      return NextResponse.json(
+        { success: false, message: "Pendaftaran untuk season ini sedang ditutup." },
+        { status: 400 }
+      );
+    }
+
     // Accept multipart/form-data (payload JSON + optional proof file) or plain JSON.
     let body: unknown;
     let proofFile: File | null = null;
@@ -60,7 +75,12 @@ export async function POST(req: NextRequest) {
     const existing = await db
       .select({ count: count() })
       .from(registrations)
-      .where(sql`lower(${registrations.teamName}) = lower(${data.teamName})`);
+      .where(
+        and(
+          eq(registrations.seasonId, season.id),
+          sql`lower(${registrations.teamName}) = lower(${data.teamName})`
+        )
+      );
 
     const existingCount = existing[0]?.count ?? 0;
     if (Number(existingCount) > 0) {
@@ -73,12 +93,13 @@ export async function POST(req: NextRequest) {
     // Check total registrations (max slots)
     const totalSlots = await db
       .select({ slot: registrations.slot })
-      .from(registrations);
+      .from(registrations)
+      .where(eq(registrations.seasonId, season.id));
     const total = totalSlots.reduce(
       (sum, row) => sum + Math.max(1, Number(row.slot ?? 1)),
       0
     );
-    if (total + data.slot > 100) {
+    if (total + data.slot > season.maxSlots) {
       return NextResponse.json(
         { success: false, message: "Slot pendaftaran sudah penuh." },
         { status: 400 }
@@ -99,6 +120,7 @@ export async function POST(req: NextRequest) {
     const newReg = await db
       .insert(registrations)
       .values({
+        seasonId: season.id,
         paymentProofPath,
         status: "pending",
         teamName: data.teamName,
@@ -156,14 +178,19 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   try {
+    const season = await getActiveSeason();
+    if (!season) {
+      return NextResponse.json({ success: true, total: 0, season: null });
+    }
     const data = await db
       .select({ slot: registrations.slot })
-      .from(registrations);
+      .from(registrations)
+      .where(eq(registrations.seasonId, season.id));
     const total = data.reduce(
       (sum, row) => sum + Math.max(1, Number(row.slot ?? 1)),
       0
     );
-    return NextResponse.json({ success: true, total });
+    return NextResponse.json({ success: true, total, season });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ success: false, total: 0 }, { status: 500 });

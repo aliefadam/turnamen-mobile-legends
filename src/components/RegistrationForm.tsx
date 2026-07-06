@@ -36,7 +36,13 @@ type FormData = z.infer<typeof formSchema>;
 
 const defaultPlayer = { name: "", mlId: "", server: "" };
 
-export default function RegistrationForm() {
+export default function RegistrationForm({
+  seasonName,
+  registrationOpen,
+}: {
+  seasonName: string | null;
+  registrationOpen: boolean;
+}) {
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -130,7 +136,7 @@ export default function RegistrationForm() {
       try {
         const res = await fetch(
           `/api/register/check-team?name=${encodeURIComponent(name)}`,
-          { signal: controller.signal }
+          { signal: controller.signal },
         );
         const json = await res.json();
         if (json.available === true) setTeamStatus("available");
@@ -148,6 +154,11 @@ export default function RegistrationForm() {
   }, [teamName]);
 
   const nextStep = async () => {
+    if (!registrationOpen) {
+      toast.error("Pendaftaran untuk season aktif sedang ditutup.");
+      return;
+    }
+
     let fields: (keyof FormData)[] = [];
     if (step === 0)
       fields = ["teamName", "leaderName", "leaderWhatsapp", "slot"];
@@ -168,6 +179,11 @@ export default function RegistrationForm() {
   const prevStep = () => setStep((s) => s - 1);
 
   const onSubmit = async (data: FormData) => {
+    if (!registrationOpen) {
+      toast.error("Pendaftaran untuk season aktif sedang ditutup.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const formData = new FormData();
@@ -265,6 +281,28 @@ export default function RegistrationForm() {
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="p-6">
+            {/* {seasonName && (
+              <div className="mb-5 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-orange-500">
+                  Season Aktif
+                </p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {seasonName}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Form ini akan mendaftarkan tim ke season yang sedang aktif.
+                </p>
+              </div>
+            )} */}
+
+            {!registrationOpen && (
+              <div className="mb-5 rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
+                <p className="text-sm font-semibold text-red-600">
+                  Pendaftaran untuk season ini sedang ditutup oleh panitia.
+                </p>
+              </div>
+            )}
+
             <AnimatePresence mode="wait">
               {/* STEP 0: Team Info */}
               {step === 0 && (
@@ -283,16 +321,31 @@ export default function RegistrationForm() {
                     <div className="relative">
                       <input
                         {...register("teamName")}
-                        placeholder="Contoh: Team Alpha"
+                        placeholder="Contoh: YourevillSQ"
                         className={`input-field w-full px-4 py-3 pr-11 rounded-xl bg-gray-50 text-gray-800 placeholder-gray-400 text-sm font-medium
                           ${teamStatus === "taken" ? "border-red-300! focus:border-red-400!" : ""}
                           ${teamStatus === "available" ? "border-green-300! focus:border-green-400!" : ""}`}
                       />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2">
                         {teamStatus === "checking" && (
-                          <svg className="animate-spin h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          <svg
+                            className="animate-spin h-4 w-4 text-gray-400"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                            />
                           </svg>
                         )}
                         {teamStatus === "available" && (
@@ -308,7 +361,9 @@ export default function RegistrationForm() {
                         {errors.teamName.message}
                       </p>
                     ) : teamStatus === "checking" ? (
-                      <p className="text-gray-400 text-xs mt-1">Memeriksa ketersediaan nama...</p>
+                      <p className="text-gray-400 text-xs mt-1">
+                        Memeriksa ketersediaan nama...
+                      </p>
                     ) : teamStatus === "available" ? (
                       <p className="text-green-600 text-xs mt-1 flex items-center gap-1">
                         <i className="fi fi-rr-check" />
@@ -663,6 +718,7 @@ export default function RegistrationForm() {
               <motion.button
                 type="button"
                 onClick={nextStep}
+                disabled={!registrationOpen}
                 className="flex-1 px-6 py-3 rounded-xl shimmer text-white font-bold text-sm shadow-md shadow-orange-200 btn-press inline-flex items-center justify-center gap-1.5"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
@@ -673,9 +729,11 @@ export default function RegistrationForm() {
             ) : (
               <motion.button
                 type="submit"
-                disabled={isSubmitting || !proofFile}
+                disabled={isSubmitting || !proofFile || !registrationOpen}
                 title={
-                  !proofFile
+                  !registrationOpen
+                    ? "Pendaftaran sedang ditutup"
+                    : !proofFile
                     ? "Upload bukti pembayaran terlebih dahulu"
                     : undefined
                 }

@@ -27,7 +27,7 @@ const seeds: Seed[] = [
 
 async function main() {
   const { db, pool } = await import("./index");
-  const { admins } = await import("./schema");
+  const { admins, seasons } = await import("./schema");
   const { hashPassword } = await import("../lib/password");
   const { eq, notInArray } = await import("drizzle-orm");
 
@@ -61,6 +61,23 @@ async function main() {
         .values({ email, passwordHash, name: s.name, role: s.role });
       console.log(`✓ [${s.role}] ${email} — dibuat.`);
     }
+  }
+
+  const activeSeason = await db
+    .select()
+    .from(seasons)
+    .where(eq(seasons.isActive, true))
+    .limit(1);
+
+  if (activeSeason.length === 0) {
+    await db.insert(seasons).values({
+      name: "Season 1",
+      slug: "season-1",
+      isActive: true,
+      registrationOpen: true,
+      maxSlots: 100,
+    });
+    console.log("✓ Season 1 — dibuat sebagai season aktif.");
   }
 
   console.log("\nSeed selesai:");

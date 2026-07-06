@@ -92,6 +92,13 @@ export default function BracketManager({
     );
     if (ok) setEditMatch(null);
   };
+  const setPlayed = (matchId: number, played: boolean) =>
+    call(
+      "PATCH",
+      { action: "played", matchId, played },
+      played ? "Pertandingan ditandai sudah bermain" : "Status bermain dibatalkan",
+      `played:${matchId}`
+    );
 
   const handleDragStart = (matchId: number, side: 1 | 2) => {
     dragSrc.current = { matchId, side };
@@ -204,7 +211,7 @@ export default function BracketManager({
           {mode === "arrange" && (
             <p className="w-full text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2 flex items-center gap-1.5">
               <i className="fi fi-rr-grip-dots" />
-              Seret (drag) tim di ronde pertama, lalu jatuhkan ke posisi tim lain untuk menukarnya.
+              Seret (drag) tim di ronde mana pun yang sudah terisi, lalu jatuhkan ke posisi tim lain pada ronde yang sama untuk menukarnya.
             </p>
           )}
         </div>
@@ -217,6 +224,8 @@ export default function BracketManager({
           champion={bracket.champion}
           mode={boardMode}
           onEditMatch={setEditMatch}
+          onTogglePlayed={setPlayed}
+          busyAction={busyAction}
           onDragStartTeam={handleDragStart}
           onDropTeam={handleDrop}
           onChangeBestOf={changeBo}

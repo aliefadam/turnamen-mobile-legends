@@ -1,4 +1,5 @@
 import type { Registration } from "@/db/schema";
+import { getActiveSeason } from "./seasons";
 
 // Registration augmented with a short-lived signed URL for its payment proof.
 export type RegistrationWithProof = Registration & {
@@ -25,12 +26,16 @@ export async function getAllRegistrations(): Promise<{
   dbError: boolean;
 }> {
   try {
+    const season = await getActiveSeason();
+    if (!season) return { data: [], dbError: false };
+
     const { db } = await import("@/db");
     const { registrations } = await import("@/db/schema");
-    const { desc } = await import("drizzle-orm");
+    const { desc, eq } = await import("drizzle-orm");
     const rows = await db
       .select()
       .from(registrations)
+      .where(eq(registrations.seasonId, season.id))
       .orderBy(desc(registrations.createdAt));
 
     const paths = rows
@@ -63,14 +68,17 @@ export async function getRegistrationById(
 ): Promise<RegistrationWithProof | null> {
   if (!Number.isFinite(id)) return null;
   try {
+    const season = await getActiveSeason();
+    if (!season) return null;
+
     const { db } = await import("@/db");
     const { registrations } = await import("@/db/schema");
-    const { eq } = await import("drizzle-orm");
+    const { and, eq } = await import("drizzle-orm");
 
     const rows = await db
       .select()
       .from(registrations)
-      .where(eq(registrations.id, id))
+      .where(and(eq(registrations.id, id), eq(registrations.seasonId, season.id)))
       .limit(1);
 
     const r = rows[0];

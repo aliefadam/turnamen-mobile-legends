@@ -3,6 +3,7 @@ import { getAdminInfo } from "@/lib/admin-session";
 import {
   generateBracket,
   resetBracket,
+  setMatchPlayed,
   setMatchResult,
   setRoundBestOf,
   swapTeams,
@@ -48,6 +49,7 @@ export async function PATCH(req: NextRequest) {
     score2?: number;
     round?: number;
     bestOf?: number;
+    played?: boolean;
     matchAId?: number;
     sideA?: number;
     matchBId?: number;
@@ -67,6 +69,9 @@ export async function PATCH(req: NextRequest) {
         Number(body.score1),
         Number(body.score2)
       );
+      break;
+    case "played":
+      result = await setMatchPlayed(Number(body.matchId), Boolean(body.played));
       break;
     case "roundBo":
       result = await setRoundBestOf(Number(body.round), Number(body.bestOf));

@@ -10,6 +10,8 @@ export default function BracketBoard({
   champion,
   mode = "view",
   onEditMatch,
+  onTogglePlayed,
+  busyAction,
   onDragStartTeam,
   onDropTeam,
   onChangeBestOf,
@@ -19,6 +21,8 @@ export default function BracketBoard({
   champion: { id: number | null; name: string | null } | null;
   mode?: "view" | "edit" | "arrange";
   onEditMatch?: (m: BracketMatch) => void;
+  onTogglePlayed?: (matchId: number, played: boolean) => void;
+  busyAction?: string | null;
   onDragStartTeam?: (matchId: number, side: 1 | 2) => void;
   onDropTeam?: (matchId: number, side: 1 | 2) => void;
   onChangeBestOf?: (round: number, bestOf: number) => void;
@@ -29,9 +33,11 @@ export default function BracketBoard({
 
   // Connector lines (tree) drawn behind the cards.
   const containerRef = useRef<HTMLDivElement>(null);
+  const championBodyRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Map<string, HTMLElement>>(new Map());
   const [segments, setSegments] = useState<string[]>([]);
   const [dims, setDims] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  const [championTop, setChampionTop] = useState<number | null>(null);
 
   const registerNode = useCallback((key: string, el: HTMLElement | null) => {
     if (el) nodeRefs.current.set(key, el);
@@ -63,6 +69,22 @@ export default function BracketBoard({
         );
       }
       if (totalRounds >= 1) connect(`${totalRounds}-0`, "champion");
+
+      const finalRect = rectOf(`${totalRounds}-0`);
+      const championRect = rectOf("champion");
+      const championBodyRect = championBodyRef.current?.getBoundingClientRect();
+      if (finalRect && championRect && championBodyRect) {
+        const top =
+          finalRect.top +
+          finalRect.height / 2 -
+          championBodyRect.top -
+          championRect.height / 2;
+        const maxTop = Math.max(0, championBodyRect.height - championRect.height);
+        setChampionTop(Math.min(Math.max(0, top), maxTop));
+      } else {
+        setChampionTop(null);
+      }
+
       setSegments(segs);
       setDims({ w: container.offsetWidth, h: container.offsetHeight });
     };
@@ -143,6 +165,8 @@ export default function BracketBoard({
                   setDragKey={setDragKey}
                   setOverKey={setOverKey}
                   onEditMatch={onEditMatch}
+                  onTogglePlayed={onTogglePlayed}
+                  busyAction={busyAction}
                   onDragStartTeam={onDragStartTeam}
                   onDropTeam={onDropTeam}
                   registerNode={registerNode}
@@ -154,32 +178,42 @@ export default function BracketBoard({
 
         {/* Champion column */}
         <div className="relative z-10 flex flex-col min-w-[190px]">
-          <div className="px-1 mb-3">
+          <div className="flex items-center justify-between gap-2 px-1 mb-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-transparent select-none">
+              BO
+            </span>
             <span className="text-xs font-bold uppercase tracking-wider text-amber-500">
               Juara
             </span>
           </div>
-          <div className="flex-1 flex flex-col justify-center">
+          <div ref={championBodyRef} className="relative flex-1">
             <div
-              ref={(el) => registerNode("champion", el)}
-              className={`rounded-2xl p-4 text-center border-2 ${
-                champion?.name
-                  ? "border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50"
-                  : "border-dashed border-gray-200 bg-gray-50"
+              className={`absolute inset-x-0 flex justify-center ${
+                championTop == null ? "top-1/2 -translate-y-1/2" : ""
               }`}
+              style={championTop == null ? undefined : { top: `${championTop}px` }}
             >
-              <i
-                className={`fi fi-rr-trophy text-3xl ${
-                  champion?.name ? "text-amber-500" : "text-gray-300"
-                }`}
-              />
-              <p
-                className={`mt-2 font-black ${
-                  champion?.name ? "text-gray-900" : "text-gray-400 text-sm font-medium"
+              <div
+                ref={(el) => registerNode("champion", el)}
+                className={`rounded-2xl p-4 text-center border-2 min-w-[160px] ${
+                  champion?.name
+                    ? "border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50"
+                    : "border-dashed border-gray-200 bg-gray-50"
                 }`}
               >
-                {champion?.name ?? "Belum ada juara"}
-              </p>
+                <i
+                  className={`fi fi-rr-trophy text-3xl ${
+                    champion?.name ? "text-amber-500" : "text-gray-300"
+                  }`}
+                />
+                <p
+                  className={`mt-2 font-black ${
+                    champion?.name ? "text-gray-900" : "text-gray-400 text-sm font-medium"
+                  }`}
+                >
+                  {champion?.name ?? "Belum ada juara"}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -197,6 +231,8 @@ function MatchCard({
   setDragKey,
   setOverKey,
   onEditMatch,
+  onTogglePlayed,
+  busyAction,
   onDragStartTeam,
   onDropTeam,
   registerNode,
@@ -209,6 +245,8 @@ function MatchCard({
   setDragKey: (k: string | null) => void;
   setOverKey: (k: string | null) => void;
   onEditMatch?: (m: BracketMatch) => void;
+  onTogglePlayed?: (matchId: number, played: boolean) => void;
+  busyAction?: string | null;
   onDragStartTeam?: (matchId: number, side: 1 | 2) => void;
   onDropTeam?: (matchId: number, side: 1 | 2) => void;
   registerNode: (key: string, el: HTMLElement | null) => void;
@@ -217,15 +255,34 @@ function MatchCard({
   const p2 = match.team2Name != null;
   const bothPresent = p1 && p2;
   const isBye = isFirstRound && p1 !== p2;
-  const canEdit = mode === "edit" && bothPresent;
-  const arrange = mode === "arrange" && isFirstRound;
+  const matchPlayed = match.played === true;
+  const matchDone = matchPlayed && match.winnerSlot != null;
+  const matchLive = matchPlayed && match.winnerSlot == null;
+  const canEdit = mode === "edit" && bothPresent && matchPlayed;
+  const arrange = mode === "arrange";
+  const canTogglePlayed = mode === "edit" && bothPresent;
+  const matchBusy = busyAction === `played:${match.id}`;
+  const statusTone = bothPresent
+    ? matchDone
+      ? "border-emerald-200 bg-emerald-50/70"
+      : matchLive
+        ? "border-sky-200 bg-sky-50/70"
+        : "border-amber-200 bg-amber-50/70"
+    : "border-gray-200 bg-white";
 
   return (
     <div
       ref={(el) => registerNode(`${match.round}-${match.slot}`, el)}
-      className="relative rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden"
+      className={`relative rounded-xl border shadow-sm overflow-hidden transition-colors ${statusTone}`}
     >
-      <div className={canEdit ? "pr-10" : ""}>
+      {mode === "view" && (matchDone || matchLive) && (
+        <MatchStatusRibbon
+          busy={matchBusy}
+          isDone={matchDone}
+          isLive={matchLive}
+        />
+      )}
+      <div>
         <TeamRow
           side={1}
           name={match.team1Name}
@@ -267,16 +324,170 @@ function MatchCard({
         </span>
       )}
 
-      {canEdit && (
-        <button
-          onClick={() => onEditMatch?.(match)}
-          title="Input / ubah skor"
-          className="absolute inset-y-0 right-0 w-10 bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center transition-colors"
-        >
-          <i className="fi fi-rr-pencil text-sm" />
-        </button>
+      {(canTogglePlayed || canEdit) && (
+        <div className="px-3 pb-3 pt-2 border-t border-white/70">
+          <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
+            <div className="min-w-0">
+              {(matchDone || matchLive) && (
+                <MatchStatusPill
+                  busy={matchBusy}
+                  isDone={matchDone}
+                  isLive={matchLive}
+                />
+              )}
+            </div>
+            <div className="flex justify-center">
+              {canEdit && (
+                <button
+                  onClick={() => onEditMatch?.(match)}
+                  title="Input / ubah skor"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-orange-600"
+                >
+                  <i className="fi fi-rr-pencil text-xs" />
+                  Input Skor
+                </button>
+              )}
+            </div>
+            {canTogglePlayed && (
+              <button
+                onClick={() => onTogglePlayed?.(match.id, !matchPlayed)}
+                disabled={matchBusy}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-bold transition-colors disabled:opacity-60 ${
+                  matchPlayed
+                    ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    : "bg-amber-500 text-white hover:bg-amber-600"
+                }`}
+              >
+                {matchBusy ? (
+                  <>
+                    <Spinner className="h-3.5 w-3.5" />
+                    Memproses...
+                  </>
+                ) : matchPlayed ? (
+                  <>
+                    <i className="fi fi-rr-rotate-left" />
+                    Batalkan
+                  </>
+                ) : (
+                  <>
+                    <i className="fi fi-rr-play-alt" />
+                    Tandai Bermain
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+          {canTogglePlayed && !matchPlayed && (
+            <p className="mt-2 text-[11px] text-amber-700/90">
+              Input skor baru aktif setelah pertandingan ini ditandai sudah bermain.
+            </p>
+          )}
+        </div>
       )}
     </div>
+  );
+}
+
+function MatchStatusRibbon({
+  busy,
+  isDone,
+  isLive,
+}: {
+  busy: boolean;
+  isDone: boolean;
+  isLive: boolean;
+}) {
+  const tone = isDone
+    ? "bg-emerald-500/95 text-white shadow-emerald-200"
+    : "bg-sky-500/95 text-white shadow-sky-200";
+  const icon = isDone
+    ? "fi-rr-badge-check"
+    : "fi-rr-signal-stream";
+  const label = isDone ? "Sudah bermain" : "Sedang bermain";
+
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-1/2 z-20 flex -translate-y-1/2 justify-center px-3">
+      <MatchStatusContent
+        busy={busy}
+        icon={icon}
+        label={label}
+        tone={tone}
+        isLive={isLive}
+        size="ribbon"
+      />
+    </div>
+  );
+}
+
+function MatchStatusPill({
+  busy,
+  isDone,
+  isLive,
+}: {
+  busy: boolean;
+  isDone: boolean;
+  isLive: boolean;
+}) {
+  const tone = isDone
+    ? "bg-emerald-100 text-emerald-700"
+    : "bg-sky-100 text-sky-700";
+  const icon = isDone ? "fi-rr-badge-check" : "fi-rr-signal-stream";
+  const label = isDone ? "Sudah bermain" : "Sedang bermain";
+
+  return (
+    <MatchStatusContent
+      busy={busy}
+      icon={icon}
+      label={label}
+      tone={tone}
+      isLive={isLive}
+      size="pill"
+    />
+  );
+}
+
+function MatchStatusContent({
+  busy,
+  icon,
+  label,
+  tone,
+  isLive,
+  size,
+}: {
+  busy: boolean;
+  icon: string;
+  label: string;
+  tone: string;
+  isLive: boolean;
+  size: "ribbon" | "pill";
+}) {
+  const baseClass =
+    size === "ribbon"
+      ? "inline-flex items-center justify-center gap-1 rounded-full px-2.5 py-0.5 text-[8px] font-black uppercase tracking-[0.08em] shadow-md"
+      : "inline-flex items-center justify-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold";
+  const iconClass =
+    size === "ribbon"
+      ? `h-2.5 w-2.5 ${isLive ? "animate-pulse" : ""}`
+      : `h-3.5 w-3.5 ${isLive ? "animate-pulse" : ""}`;
+
+  return (
+    <span className={`${baseClass} ${tone}`}>
+      {busy ? (
+        <Spinner className={`${iconClass} ${size === "ribbon" ? "text-white" : "text-current"}`} />
+      ) : (
+        <i className={`fi ${icon} ${isLive ? "animate-pulse" : ""}`} />
+      )}
+      {label}
+    </span>
+  );
+}
+
+function Spinner({ className = "h-4 w-4 text-current" }: { className?: string }) {
+  return (
+    <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
   );
 }
 

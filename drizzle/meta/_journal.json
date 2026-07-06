@@ -50,6 +50,13 @@
       "when": 1783053338728,
       "tag": "0006_melodic_selene",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1783305500379,
+      "tag": "0007_glorious_energizer",
+      "breakpoints": true
     }
   ]
 }
