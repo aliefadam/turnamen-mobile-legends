@@ -1,6 +1,10 @@
 import Link from "next/link";
-import { getRegistrationStats } from "@/lib/registrations";
-import { getActiveSeason } from "@/lib/seasons";
+import { getRegistrationStatsForSeason } from "@/lib/registrations";
+import {
+  getActiveSeason,
+  getSeasonBySlug,
+  listSeasons,
+} from "@/lib/seasons";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +18,21 @@ function formatDate(d: Date | string) {
   });
 }
 
-export default async function DashboardPage() {
-  const [stats, season] = await Promise.all([getRegistrationStats(), getActiveSeason()]);
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ season?: string }>;
+}) {
+  const { season: seasonSlug } = await searchParams;
+  const [activeSeason, seasons, requestedSeason] = await Promise.all([
+    getActiveSeason(),
+    listSeasons(),
+    seasonSlug ? getSeasonBySlug(seasonSlug) : Promise.resolve(null),
+  ]);
+
+  const season = requestedSeason ?? activeSeason;
+  const stats = await getRegistrationStatsForSeason(season?.id);
+  const isArchive = Boolean(season && activeSeason && season.id !== activeSeason.id);
 
   const cards = [
     {
@@ -49,14 +66,14 @@ export default async function DashboardPage() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">
-            Season Aktif
+            {isArchive ? "Mode Arsip" : "Season Aktif"}
           </p>
           <p className="text-2xl font-black text-gray-900">
             {season?.name ?? "Belum ada season aktif"}
           </p>
           <p className="text-sm text-gray-500 mt-1">
             {season
-              ? `Pendaftaran ${season.registrationOpen ? "dibuka" : "ditutup"} • Maks ${season.maxSlots} slot`
+              ? `${isArchive ? "Melihat histori season ini" : `Pendaftaran ${season.registrationOpen ? "dibuka" : "ditutup"}`} • Maks ${season.maxSlots} slot`
               : "Aktifkan season agar form user dan admin sinkron."}
           </p>
         </div>
@@ -78,7 +95,6 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((c) => (
           <div
@@ -98,7 +114,6 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Recent registrations */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="font-bold text-gray-900 flex items-center gap-2">
@@ -106,7 +121,7 @@ export default async function DashboardPage() {
             Pendaftaran Terbaru
           </h2>
           <Link
-            href="/admin/peserta"
+            href={season ? `/admin/peserta?season=${encodeURIComponent(season.slug)}` : "/admin/peserta"}
             className="text-sm font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1"
           >
             Lihat semua

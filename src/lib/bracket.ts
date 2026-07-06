@@ -288,8 +288,8 @@ function recompute(matches: M[]): M[] {
 }
 
 // ---------- DB access ----------
-async function loadMatches(): Promise<M[]> {
-  const season = await getActiveSeason();
+async function loadMatches(seasonId?: number | null): Promise<M[]> {
+  const season = seasonId ? { id: seasonId } : await getActiveSeason();
   if (!season) return [];
 
   const { db } = await import("@/db");
@@ -326,9 +326,9 @@ async function persist(matches: M[]): Promise<void> {
 }
 
 // ---------- Public API ----------
-export async function getBracket(): Promise<BracketData> {
+export async function getBracket(seasonId?: number | null): Promise<BracketData> {
   try {
-    const matches = await loadMatches();
+    const matches = await loadMatches(seasonId);
     if (matches.length === 0) {
       return { exists: false, dbError: false, started: false, totalRounds: 0, rounds: [], champion: null };
     }

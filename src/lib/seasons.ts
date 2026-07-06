@@ -32,6 +32,20 @@ export async function listSeasons(): Promise<Season[]> {
   }
 }
 
+export async function getSeasonBySlug(slug: string): Promise<Season | null> {
+  try {
+    const { db } = await import("@/db");
+    const { seasons } = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const rows = await db.select().from(seasons).where(eq(seasons.slug, slug)).limit(1);
+    return rows[0] ?? null;
+  } catch (error) {
+    console.error("getSeasonBySlug failed:", error);
+    return null;
+  }
+}
+
 export function slugifySeasonName(name: string): string {
   return name
     .trim()

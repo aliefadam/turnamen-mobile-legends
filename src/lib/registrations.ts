@@ -25,8 +25,19 @@ export async function getAllRegistrations(): Promise<{
   data: RegistrationWithProof[];
   dbError: boolean;
 }> {
+  return getAllRegistrationsForSeason();
+}
+
+export async function getAllRegistrationsForSeason(
+  seasonId?: number | null
+): Promise<{
+  data: RegistrationWithProof[];
+  dbError: boolean;
+}> {
   try {
-    const season = await getActiveSeason();
+    const season = seasonId
+      ? { id: seasonId }
+      : await getActiveSeason();
     if (!season) return { data: [], dbError: false };
 
     const { db } = await import("@/db");
@@ -98,7 +109,13 @@ export async function getRegistrationById(
 }
 
 export async function getRegistrationStats(): Promise<RegistrationStats> {
-  const { data, dbError } = await getAllRegistrations();
+  return getRegistrationStatsForSeason();
+}
+
+export async function getRegistrationStatsForSeason(
+  seasonId?: number | null
+): Promise<RegistrationStats> {
+  const { data, dbError } = await getAllRegistrationsForSeason(seasonId);
 
   const totalTeams = data.length;
   const totalSlots = data.reduce((sum, r) => sum + (r.slot ?? 0), 0);

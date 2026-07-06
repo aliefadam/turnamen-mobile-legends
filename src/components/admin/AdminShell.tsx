@@ -2,34 +2,64 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import AppToaster from "@/components/AppToaster";
 import TopLoader from "@/components/admin/TopLoader";
+import type { Season } from "@/db/schema";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: "fi-rr-dashboard", exact: true },
   { href: "/admin/peserta", label: "Daftar Peserta", icon: "fi-rr-users" },
   { href: "/admin/bracket", label: "Bracket", icon: "fi-rr-sitemap" },
-  { href: "/admin/seasons", label: "Season", icon: "fi-rr-layers", superadminOnly: true },
+  {
+    href: "/admin/seasons",
+    label: "Season",
+    icon: "fi-rr-layers",
+    superadminOnly: true,
+  },
 ];
 
-type AdminInfo = { email: string; name: string | null; role: "admin" | "superadmin" } | null;
+type AdminInfo = {
+  email: string;
+  name: string | null;
+  role: "admin" | "superadmin";
+} | null;
 
 export default function AdminShell({
   children,
   admin,
+  seasons,
+  activeSeasonSlug,
 }: {
   children: React.ReactNode;
   admin?: AdminInfo;
+  seasons: Season[];
+  activeSeasonSlug: string | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const isActive = (href: string, exact?: boolean) =>
-    exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
+    exact
+      ? pathname === href
+      : pathname === href || pathname.startsWith(href + "/");
+
+  const selectedSeasonSlug =
+    searchParams.get("season") || activeSeasonSlug || "";
+  const showSeasonSwitcher =
+    pathname.startsWith("/admin") && !pathname.startsWith("/admin/seasons");
+
+  const changeSeason = (slug: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (slug) params.set("season", slug);
+    else params.delete("season");
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname);
+  };
 
   const logout = async () => {
     setLoggingOut(true);
@@ -63,25 +93,28 @@ export default function AdminShell({
           Menu
         </p>
         {navItems
-          .filter((item) => !item.superadminOnly || admin?.role === "superadmin")
+          .filter(
+            (item) => !item.superadminOnly || admin?.role === "superadmin",
+          )
           .map((item) => {
-          const active = isActive(item.href, item.exact);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors
-                ${active
-                  ? "bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-md shadow-orange-200"
-                  : "text-gray-600 hover:bg-orange-50 hover:text-orange-600"
+            const active = isActive(item.href, item.exact);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors
+                ${
+                  active
+                    ? "bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-md shadow-orange-200"
+                    : "text-gray-600 hover:bg-orange-50 hover:text-orange-600"
                 }`}
-            >
-              <i className={`fi ${item.icon} text-base`} />
-              {item.label}
-            </Link>
-          );
-        })}
+              >
+                <i className={`fi ${item.icon} text-base`} />
+                {item.label}
+              </Link>
+            );
+          })}
       </nav>
 
       {/* Logout */}
@@ -124,7 +157,7 @@ export default function AdminShell({
       {/* Main */}
       <div className="lg:pl-64">
         {/* Topbar */}
-        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-gray-100 h-16 flex items-center gap-3 px-4 sm:px-6">
+        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-gray-100 min-h-16 flex items-center gap-3 px-4 py-3 sm:px-6">
           <button
             onClick={() => setMobileOpen(true)}
             className="lg:hidden w-9 h-9 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-600"
@@ -135,7 +168,38 @@ export default function AdminShell({
           <h1 className="font-bold text-gray-900">
             {navItems.find((n) => isActive(n.href, n.exact))?.label ?? "Admin"}
           </h1>
+          {showSeasonSwitcher && seasons.length > 0 && (
+            <div className="hidden md:flex items-center gap-2 ml-2">
+              <select
+                value={selectedSeasonSlug}
+                onChange={(e) => changeSeason(e.target.value)}
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-200"
+              >
+                {seasons.map((season) => (
+                  <option key={season.id} value={season.slug}>
+                    {season.name}
+                    {season.slug === activeSeasonSlug ? " • Aktif" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="ml-auto flex items-center gap-2.5">
+            {showSeasonSwitcher && seasons.length > 0 && (
+              <div className="md:hidden">
+                <select
+                  value={selectedSeasonSlug}
+                  onChange={(e) => changeSeason(e.target.value)}
+                  className="max-w-[132px] rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-200"
+                >
+                  {seasons.map((season) => (
+                    <option key={season.id} value={season.slug}>
+                      {season.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             {admin && <RoleBadge role={admin.role} />}
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white">
               <i className="fi fi-rr-user text-sm" />
@@ -144,9 +208,7 @@ export default function AdminShell({
               <p className="text-sm font-semibold text-gray-800">
                 {admin?.name || "Admin"}
               </p>
-              <p className="text-[11px] text-gray-400">
-                {admin?.email || "-"}
-              </p>
+              <p className="text-[11px] text-gray-400">{admin?.email || "-"}</p>
             </div>
           </div>
         </header>
@@ -162,9 +224,8 @@ function RoleBadge({ role }: { role: "admin" | "superadmin" }) {
   return (
     <span
       className={`hidden sm:inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full
-        ${isSuper
-          ? "bg-amber-100 text-amber-700"
-          : "bg-gray-100 text-gray-500"
+        ${
+          isSuper ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500"
         }`}
     >
       <i className={`fi ${isSuper ? "fi-rr-crown" : "fi-rr-shield"}`} />
