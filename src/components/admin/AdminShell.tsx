@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import AppToaster from "@/components/AppToaster";
 import TopLoader from "@/components/admin/TopLoader";
+import SeasonSwitcher from "@/components/admin/SeasonSwitcher";
 import type { Season } from "@/db/schema";
 
 const navItems = [
@@ -53,13 +54,12 @@ export default function AdminShell({
   const showSeasonSwitcher =
     pathname.startsWith("/admin") && !pathname.startsWith("/admin/seasons");
 
-  const changeSeason = (slug: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (slug) params.set("season", slug);
-    else params.delete("season");
-    const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
-  };
+  // Preserve the viewed (archive) season across sidebar navigation so every
+  // page loads the same season. Active season keeps clean URLs (no param).
+  const seasonQuery =
+    selectedSeasonSlug && selectedSeasonSlug !== activeSeasonSlug
+      ? `?season=${encodeURIComponent(selectedSeasonSlug)}`
+      : "";
 
   const logout = async () => {
     setLoggingOut(true);
@@ -101,7 +101,7 @@ export default function AdminShell({
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={`${item.href}${seasonQuery}`}
                 onClick={() => setMobileOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors
                 ${
@@ -169,37 +169,11 @@ export default function AdminShell({
             {navItems.find((n) => isActive(n.href, n.exact))?.label ?? "Admin"}
           </h1>
           {showSeasonSwitcher && seasons.length > 0 && (
-            <div className="hidden md:flex items-center gap-2 ml-2">
-              <select
-                value={selectedSeasonSlug}
-                onChange={(e) => changeSeason(e.target.value)}
-                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-200"
-              >
-                {seasons.map((season) => (
-                  <option key={season.id} value={season.slug}>
-                    {season.name}
-                    {season.slug === activeSeasonSlug ? " • Aktif" : ""}
-                  </option>
-                ))}
-              </select>
+            <div className="ml-1 sm:ml-2 min-w-0">
+              <SeasonSwitcher seasons={seasons} activeSlug={activeSeasonSlug} />
             </div>
           )}
           <div className="ml-auto flex items-center gap-2.5">
-            {showSeasonSwitcher && seasons.length > 0 && (
-              <div className="md:hidden">
-                <select
-                  value={selectedSeasonSlug}
-                  onChange={(e) => changeSeason(e.target.value)}
-                  className="max-w-[132px] rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-200"
-                >
-                  {seasons.map((season) => (
-                    <option key={season.id} value={season.slug}>
-                      {season.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
             {admin && <RoleBadge role={admin.role} />}
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white">
               <i className="fi fi-rr-user text-sm" />
