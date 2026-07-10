@@ -15,17 +15,20 @@ export default async function Home() {
       <FloatingParticles />
 
       <main className="relative min-h-screen bg-white flex flex-col">
-        <HeroSection seasonName={season?.name ?? null} registrationOpen={season?.registrationOpen ?? false} />
+        <HeroSection
+          seasonName={season?.name ?? null}
+          registrationOpen={season?.registrationOpen ?? false}
+        />
 
         {/* Sistem Pertandingan */}
         <section className="relative z-10 pt-10 px-4">
           <div className="text-center mb-6">
-            <span className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-700 text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full mb-3">
+            {/* <span className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-700 text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full mb-3">
               <i className="fi fi-rr-sword text-sm" />
               Sistem Pertandingan
-            </span>
+            </span> */}
             <h2 className="text-2xl sm:text-3xl font-black text-gray-900">
-              Format <span className="text-orange-500">Turnamen</span>
+              Sistem <span className="text-orange-500">Pertandingan</span>
             </h2>
             <p className="text-gray-500 text-sm mt-2 max-w-md mx-auto">
               Turnamen menggunakan sistem gugur (single elimination).
@@ -39,7 +42,7 @@ export default async function Home() {
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                  Penyisihan
+                  Qualifiers & Semifinal
                 </p>
                 <p className="text-lg font-black text-gray-900">
                   Best of 1 <span className="text-orange-500">(BO1)</span>
@@ -53,7 +56,7 @@ export default async function Home() {
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                  Semifinal &amp; Final
+                  Final
                 </p>
                 <p className="text-lg font-black text-gray-900">
                   Best of 3 <span className="text-orange-500">(BO3)</span>
@@ -66,7 +69,10 @@ export default async function Home() {
         </section>
 
         {/* Registration Form */}
-        <section id="daftar" className="relative z-10 pt-12 pb-8 scroll-mt-6 flex-1">
+        <section
+          id="daftar"
+          className="relative z-10 pt-12 pb-8 scroll-mt-6 flex-1"
+        >
           <div className="text-center mb-8 px-4">
             <span className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-700 text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full mb-3">
               <i className="fi fi-rr-edit text-sm" />
