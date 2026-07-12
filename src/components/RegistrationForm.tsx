@@ -48,7 +48,6 @@ export default function RegistrationForm({
   const [success, setSuccess] = useState(false);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [teamStatus, setTeamStatus] = useState<
     "idle" | "checking" | "available" | "taken"
   >("idle");
@@ -72,16 +71,6 @@ export default function RegistrationForm({
     if (proofPreview) URL.revokeObjectURL(proofPreview);
     setProofFile(null);
     setProofPreview(null);
-  };
-
-  const copyAccount = async () => {
-    try {
-      await navigator.clipboard.writeText("6170629785");
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
-      toast.error("Gagal menyalin nomor rekening");
-    }
   };
 
   const {
@@ -615,33 +604,20 @@ export default function RegistrationForm({
                         <span className="font-bold text-orange-500">
                           Rp {watchAll.slot === 1 ? "50.000" : "100.000"}
                         </span>{" "}
-                        ke rekening berikut:
+                        dengan memindai QRIS berikut:
                       </p>
 
-                      <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-orange-100 rounded-xl p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="bg-blue-600 text-white text-xs font-black px-2 py-1 rounded">
-                            BCA
-                          </span>
-                          <span className="text-xs text-gray-500 font-medium">
-                            A/n Alief Sya&apos;arah Adam
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-lg font-black text-gray-800 tracking-wider tabular-nums">
-                            6170629785
-                          </span>
-                          <button
-                            type="button"
-                            onClick={copyAccount}
-                            className="flex items-center gap-1.5 text-xs font-semibold text-orange-600 bg-white border border-orange-200 rounded-lg px-3 py-1.5 hover:bg-orange-50 transition-colors btn-press"
-                          >
-                            <i
-                              className={`fi ${copied ? "fi-rr-check" : "fi-rr-copy"}`}
-                            />
-                            {copied ? "Tersalin" : "Salin"}
-                          </button>
-                        </div>
+                      <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-orange-100 rounded-xl p-4 flex flex-col items-center gap-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/qris.jpeg"
+                          alt="Kode QRIS pembayaran"
+                          className="w-full max-w-xs rounded-lg bg-white"
+                        />
+                        <span className="text-xs text-gray-500 font-medium text-center">
+                          Scan QRIS di atas menggunakan aplikasi pembayaran apa
+                          pun (GoPay, OVO, DANA, m-banking, dll.)
+                        </span>
                       </div>
 
                       {/* Upload Proof */}
