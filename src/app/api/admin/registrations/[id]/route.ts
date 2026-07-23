@@ -212,16 +212,27 @@ export async function PATCH(
     }
 
     // On confirmation, notify the team leader via WhatsApp (best-effort).
+    // Report the delivery result separately: the registration update remains
+    // successful even when the external WhatsApp gateway is unavailable.
+    let whatsappSent: boolean | null = null;
     if (parsed.data.status === "confirmed") {
       try {
         const { notifyLeaderConfirmed } = await import("@/lib/whatsapp");
-        await notifyLeaderConfirmed(updated[0].leaderWhatsapp, updated[0].teamName);
+        whatsappSent = await notifyLeaderConfirmed(
+          updated[0].leaderWhatsapp,
+          updated[0].teamName,
+        );
       } catch (waError) {
         console.error("WA notify (confirm) failed:", waError);
+        whatsappSent = false;
       }
     }
 
-    return NextResponse.json({ success: true, status: parsed.data.status });
+    return NextResponse.json({
+      success: true,
+      status: parsed.data.status,
+      whatsappSent,
+    });
   } catch (error) {
     console.error("Update status error:", error);
     return NextResponse.json(

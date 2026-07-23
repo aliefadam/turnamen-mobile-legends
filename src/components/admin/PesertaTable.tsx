@@ -34,6 +34,11 @@ type AttendanceActionState =
   | { action: "markAll" }
   | { action: "reset" }
   | null;
+type WhatsAppFailure = {
+  teamName: string;
+  leaderName: string;
+  leaderWhatsapp: string;
+};
 
 function mainPlayers(r: Registration): Player[] {
   return [
@@ -106,6 +111,8 @@ export default function PesertaTable({
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [attnBusy, setAttnBusy] = useState(false);
   const [attnAction, setAttnAction] = useState<AttendanceActionState>(null);
+  const [whatsappFailure, setWhatsappFailure] =
+    useState<WhatsAppFailure | null>(null);
 
   const router = useRouter();
   const [isRefreshing, startRefresh] = useTransition();
@@ -140,6 +147,13 @@ export default function PesertaTable({
           current.map((row) => (row.id === reg.id ? { ...row, status } : row)),
         );
         setSelected((s) => (s && s.id === reg.id ? { ...s, status } : s));
+        if (status === "confirmed" && json.whatsappSent === false) {
+          setWhatsappFailure({
+            teamName: reg.teamName,
+            leaderName: reg.leaderName,
+            leaderWhatsapp: reg.leaderWhatsapp,
+          });
+        }
         router.refresh();
       } else {
         toast.error(json.message || "Gagal memperbarui status");
@@ -591,7 +605,101 @@ export default function PesertaTable({
         onCancel={() => !deleting && setDeleteTarget(null)}
         onConfirm={confirmDelete}
       />
+
+      <WhatsAppFailureModal
+        failure={whatsappFailure}
+        onClose={() => setWhatsappFailure(null)}
+      />
     </div>
+  );
+}
+
+function WhatsAppFailureModal({
+  failure,
+  onClose,
+}: {
+  failure: WhatsAppFailure | null;
+  onClose: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {failure && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="fixed inset-0 z-[10001] flex items-center justify-center bg-gray-950/60 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="whatsapp-failure-title"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, y: 18 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 12 }}
+            transition={{ type: "spring", stiffness: 320, damping: 28 }}
+            onClick={(event) => event.stopPropagation()}
+            className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
+          >
+            <div className="bg-amber-50 px-6 pb-5 pt-6">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400 text-white shadow-lg shadow-amber-200">
+                <i className="fi fi-rr-triangle-warning text-2xl" />
+              </div>
+              <p className="mb-1 text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+                Konfirmasi berhasil
+              </p>
+              <h3
+                id="whatsapp-failure-title"
+                className="text-xl font-black leading-tight text-gray-950"
+              >
+                Pesan WhatsApp tidak terkirim
+              </h3>
+            </div>
+
+            <div className="px-6 py-5">
+              <p className="text-sm leading-6 text-gray-600">
+                Tim <strong className="text-gray-900">{failure.teamName}</strong>{" "}
+                sudah terkonfirmasi, tetapi gateway WhatsApp mengalami kendala.
+                Silakan hubungi ketua tim secara manual.
+              </p>
+
+              <div className="my-5 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                  Ketua tim
+                </p>
+                <p className="mt-1 font-bold text-gray-900">
+                  {failure.leaderName}
+                </p>
+                <p className="mt-0.5 text-sm text-gray-500">
+                  {failure.leaderWhatsapp}
+                </p>
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 rounded-xl px-4 py-3 text-sm font-bold text-gray-500 transition-colors hover:bg-gray-100"
+                >
+                  Tutup
+                </button>
+                <a
+                  href={waLink(failure.leaderWhatsapp)}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={onClose}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-500 px-4 py-3 text-sm font-black text-white shadow-lg shadow-green-200 transition-all hover:bg-green-600 active:scale-[0.98]"
+                >
+                  <i className="fi fi-brands-whatsapp text-lg" />
+                  Hubungi Manual
+                </a>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
