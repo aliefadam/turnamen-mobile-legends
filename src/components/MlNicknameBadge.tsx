@@ -3,9 +3,15 @@
 import { useEffect, useState } from "react";
 
 type LookupState =
-  | { status: "idle" | "loading" }
-  | { status: "success"; nickname: string; country: string | null }
-  | { status: "error"; message: string };
+  | { status: "idle" }
+  | { status: "loading"; key: string }
+  | {
+      status: "success";
+      key: string;
+      nickname: string;
+      country: string | null;
+    }
+  | { status: "error"; key: string; message: string };
 
 export default function MlNicknameBadge({
   mlId,
@@ -20,13 +26,14 @@ export default function MlNicknameBadge({
   const cleanId = mlId?.trim() ?? "";
   const cleanServer = server?.trim() ?? "";
   const ready = /^\d+$/.test(cleanId) && /^\d+$/.test(cleanServer);
+  const lookupKey = `${cleanId}:${cleanServer}`;
 
   useEffect(() => {
     if (!ready) return;
 
     const controller = new AbortController();
     const timer = setTimeout(async () => {
-      setState({ status: "loading" });
+      setState({ status: "loading", key: lookupKey });
       try {
         const params = new URLSearchParams({
           id: cleanId,
@@ -40,12 +47,14 @@ export default function MlNicknameBadge({
         if (response.ok && data.success && data.nickname) {
           setState({
             status: "success",
+            key: lookupKey,
             nickname: data.nickname,
             country: data.country ?? null,
           });
         } else {
           setState({
             status: "error",
+            key: lookupKey,
             message: data.message || "Nickname tidak ditemukan.",
           });
         }
@@ -53,6 +62,7 @@ export default function MlNicknameBadge({
         if (!controller.signal.aborted) {
           setState({
             status: "error",
+            key: lookupKey,
             message: "Gagal mengecek nickname.",
           });
         }
@@ -63,11 +73,15 @@ export default function MlNicknameBadge({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [cleanId, cleanServer, ready]);
+  }, [cleanId, cleanServer, lookupKey, ready]);
 
-  if (!ready || state.status === "idle") return null;
+  if (!ready) return null;
 
-  if (state.status === "loading") {
+  if (
+    state.status === "idle" ||
+    state.key !== lookupKey ||
+    state.status === "loading"
+  ) {
     return (
       <span
         className={`mt-1.5 inline-flex items-center gap-1.5 text-gray-400 ${

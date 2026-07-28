@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 const MLBB_NICKNAME_API = "https://api.isan.eu.org/nickname/ml";
 const NUMERIC_ID = /^\d+$/;
 
@@ -36,7 +38,7 @@ export async function GET(req: NextRequest) {
     const response = await fetch(url, {
       headers: { Accept: "application/json" },
       signal: controller.signal,
-      next: { revalidate: 86_400 },
+      cache: "no-store",
     });
     const data = (await response.json().catch(() => null)) as IsanResponse | null;
 
@@ -55,7 +57,7 @@ export async function GET(req: NextRequest) {
       },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=604800",
+          "Cache-Control": "no-store, max-age=0",
         },
       },
     );
