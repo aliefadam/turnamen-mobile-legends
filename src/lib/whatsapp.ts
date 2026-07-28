@@ -1,7 +1,9 @@
-// WhatsApp notifications via self-hosted WA gateway (dokterkoding).
-// Endpoint: POST /api/messages/send  ·  Auth: X-API-Key  ·  Body: { to, message }
+// WhatsApp notifications via the self-hosted WA Gateway.
+// Endpoint: POST /api/v1/send-message
+// Auth: Authorization: Bearer <api_key>
+// Body: { recipient, message }
 
-const WA_BASE = "https://wa-gateway.dokterkoding.my.id";
+const WA_BASE = "https://floralwhite-termite-490002.hostingersite.com";
 
 // WhatsApp group (JID) that receives new-registration notifications.
 // const GROUP_JID = "120363419728601551@g.us";
@@ -56,13 +58,14 @@ export async function sendWhatsApp(
     return false;
   }
   try {
-    const res = await fetch(`${WA_BASE}/api/messages/send`, {
+    const res = await fetch(`${WA_BASE}/api/v1/send-message`, {
       method: "POST",
       headers: {
+        Accept: "application/json",
         "Content-Type": "application/json",
-        "X-API-Key": apiKey,
+        Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({ to: normalizePhone(to), message }),
+      body: JSON.stringify({ recipient: normalizePhone(to), message }),
     });
     if (!res.ok) {
       console.error(
