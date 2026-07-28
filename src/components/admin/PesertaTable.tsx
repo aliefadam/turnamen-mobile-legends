@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import type { Registration } from "@/db/schema";
 import type { RegistrationWithProof } from "@/lib/registrations";
+import MlNicknameBadge from "@/components/MlNicknameBadge";
 
 function formatDate(d: Date | string) {
   return new Date(d).toLocaleDateString("id-ID", {
@@ -1297,6 +1298,7 @@ function PlayerList({
               <p className="text-xs text-gray-400">
                 ID: {p.mlId || "-"} • Server: {p.server || "-"}
               </p>
+              <MlNicknameBadge mlId={p.mlId} server={p.server} compact />
             </div>
           </li>
         ))}

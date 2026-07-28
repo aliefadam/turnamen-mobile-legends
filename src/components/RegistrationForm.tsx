@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import toast from "react-hot-toast";
 import { downloadProofImage } from "@/lib/proof-image";
+import MlNicknameBadge from "@/components/MlNicknameBadge";
 
 const playerSchema = z.object({
   name: z.string().min(1, "Wajib diisi"),
@@ -480,6 +481,8 @@ export default function RegistrationForm({
                       label={`Pemain ${pi + 1}${pi === 0 ? " (Captain)" : ""}`}
                       register={register}
                       prefix={`players.${pi}`}
+                      mlId={watchAll.players?.[pi]?.mlId}
+                      server={watchAll.players?.[pi]?.server}
                       errors={errors?.players?.[pi]}
                     />
                   ))}
@@ -520,6 +523,8 @@ export default function RegistrationForm({
                       label={`Cadangan ${si + 1}`}
                       register={register}
                       prefix={`substitutes.${si}`}
+                      mlId={watchAll.substitutes?.[si]?.mlId}
+                      server={watchAll.substitutes?.[si]?.server}
                       optional
                       errors={undefined}
                     />
@@ -743,6 +748,8 @@ function PlayerCard({
   label,
   register,
   prefix,
+  mlId,
+  server,
   optional = false,
   errors,
 }: {
@@ -751,6 +758,8 @@ function PlayerCard({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   register: any;
   prefix: string;
+  mlId?: string;
+  server?: string;
   optional?: boolean;
   errors?: {
     name?: { message?: string };
@@ -825,6 +834,9 @@ function PlayerCard({
               {errors.server.message}
             </p>
           )}
+        </div>
+        <div className="sm:col-span-3 -mt-1">
+          <MlNicknameBadge mlId={mlId} server={server} />
         </div>
       </div>
     </div>
