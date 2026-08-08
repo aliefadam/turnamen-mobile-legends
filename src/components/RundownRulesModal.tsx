@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
 const RUNDOWN = [
-  "Datang ke lokasi mulai jam 15.00 WIB (pertandingan mulai jam 16.00 WIB)",
+  "Datang ke lokasi mulai jam 16.00 WIB (pertandingan mulai jam 17.00 WIB)",
   "Registrasi ulang/checklog di meja panitia (depan kasir)",
   "Pengecekan identitas, ID & server ML (jika tidak sesuai → gugur)",
   "Panitia memberi nomor meja, duduk sesuai nomor yang diberikan",
@@ -64,7 +64,9 @@ export default function RundownRulesModal() {
                 <i className="fi fi-rr-list-check text-white text-lg" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-black text-white">Rundown &amp; Peraturan</h3>
+                <h3 className="text-lg font-black text-white">
+                  Rundown &amp; Peraturan
+                </h3>
                 <p className="text-white/80 text-xs">Warkop Sippo Tournament</p>
               </div>
               <button
@@ -91,7 +93,9 @@ export default function RundownRulesModal() {
                       <span className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">
                         {i + 1}
                       </span>
-                      <p className="text-sm text-gray-600 leading-relaxed">{item}</p>
+                      <p className="text-sm text-gray-600 leading-relaxed">
+                        {item}
+                      </p>
                     </li>
                   ))}
                 </ol>
@@ -108,7 +112,9 @@ export default function RundownRulesModal() {
                   {RULES.map((item, i) => (
                     <li key={i} className="flex items-start gap-3">
                       <i className="fi fi-rr-angle-right text-orange-400 text-xs mt-1 flex-shrink-0" />
-                      <p className="text-sm text-gray-600 leading-relaxed">{item}</p>
+                      <p className="text-sm text-gray-600 leading-relaxed">
+                        {item}
+                      </p>
                     </li>
                   ))}
                 </ul>
