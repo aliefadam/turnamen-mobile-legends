@@ -211,7 +211,7 @@ export default function BracketManager({
           {mode === "arrange" && (
             <p className="w-full text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2 flex items-center gap-1.5">
               <i className="fi fi-rr-grip-dots" />
-              Seret (drag) tim di ronde mana pun yang sudah terisi, lalu jatuhkan ke posisi tim lain pada ronde yang sama untuk menukarnya.
+              Seret (drag) tim dari ronde mana pun, lalu jatuhkan ke posisi tim lain untuk menukarnya—termasuk antar ronde.
             </p>
           )}
         </div>

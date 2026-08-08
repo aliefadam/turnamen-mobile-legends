@@ -85,16 +85,8 @@ function buildSeededEntries(
   size: number,
   order: number[]
 ): Array<Entrant | null> {
-  const matches = Array.from({ length: size / 2 }, () => ({
-    team1: null as Entrant | null,
-    team2: null as Entrant | null,
-  }));
-  const half = Math.max(1, matches.length / 2);
-  const topSlots = Array.from({ length: half }, (_, i) => i);
-  const bottomSlots = Array.from(
-    { length: matches.length - half },
-    (_, i) => i + half
-  );
+  const matchCount = size / 2;
+  const halfMatchCount = Math.max(1, matchCount / 2);
 
   const byRegistration = new Map<number, Entrant[]>();
   for (const entrant of shuffle(entrants)) {
@@ -102,78 +94,60 @@ function buildSeededEntries(
     list.push(entrant);
     byRegistration.set(entrant.registrationId, list);
   }
-
   const groups = shuffle(Array.from(byRegistration.values()));
+  const duplicateGroups = groups.filter((group) => group.length > 1);
+  const singles = shuffle(groups.filter((group) => group.length === 1).flat());
 
-  const placeEntrant = (entrant: Entrant, preferredSlots: number[]) => {
-    const preferredMatches = preferredSlots.map((slot) => matches[slot]).filter(Boolean);
+  // Every first-round match gets one entrant first. The remaining entrants
+  // become opponents, producing exactly `size - entrants.length` byes (the
+  // minimum possible) instead of spreading entrants over empty pairings.
+  const positionsByHalf: [number[], number[]] = [[], []];
+  const extraEntrants = entrants.length - matchCount;
+  const requiredExtraPerHalf = Math.max(0, duplicateGroups.length - halfMatchCount);
+  const minTopExtras = Math.max(requiredExtraPerHalf, extraEntrants - halfMatchCount);
+  const maxTopExtras = Math.min(halfMatchCount, extraEntrants - requiredExtraPerHalf);
+  const topExtras = minTopExtras + Math.floor(Math.random() * (maxTopExtras - minTopExtras + 1));
+  const topMatches = shuffle(Array.from({ length: halfMatchCount }, (_, i) => i));
+  const bottomMatches = shuffle(
+    Array.from({ length: matchCount - halfMatchCount }, (_, i) => i + halfMatchCount)
+  );
+  const fullMatches = new Set([
+    ...topMatches.slice(0, topExtras),
+    ...bottomMatches.slice(0, extraEntrants - topExtras),
+  ]);
 
-    const team1Preferred = preferredMatches.filter((m) => m.team1 == null);
-    if (team1Preferred.length > 0) {
-      team1Preferred[Math.floor(Math.random() * team1Preferred.length)].team1 = entrant;
-      return;
-    }
-
-    const team2Preferred = preferredMatches.filter(
-      (m) =>
-        m.team2 == null &&
-        m.team1 != null &&
-        m.team1.registrationId !== entrant.registrationId
-    );
-    if (team2Preferred.length > 0) {
-      team2Preferred[Math.floor(Math.random() * team2Preferred.length)].team2 = entrant;
-      return;
-    }
-
-    const allTeam1 = matches.filter((m) => m.team1 == null);
-    if (allTeam1.length > 0) {
-      allTeam1[Math.floor(Math.random() * allTeam1.length)].team1 = entrant;
-      return;
-    }
-
-    const allTeam2 = matches.filter(
-      (m) =>
-        m.team2 == null &&
-        m.team1 != null &&
-        m.team1.registrationId !== entrant.registrationId
-    );
-    if (allTeam2.length > 0) {
-      allTeam2[Math.floor(Math.random() * allTeam2.length)].team2 = entrant;
-      return;
-    }
-
-    const fallback = matches.filter((m) => m.team2 == null);
-    if (fallback.length > 0) {
-      fallback[Math.floor(Math.random() * fallback.length)].team2 = entrant;
-    }
-  };
-
-  const singles: Entrant[] = [];
-
-  for (const group of groups) {
-    if (group.length <= 1) {
-      singles.push(...group);
-      continue;
-    }
-
-    const halfOrder = Math.random() < 0.5 ? [topSlots, bottomSlots] : [bottomSlots, topSlots];
-    group.forEach((entrant, index) => {
-      const preferred = halfOrder[index % halfOrder.length];
-      placeEntrant(entrant, preferred);
-    });
+  for (let match = 0; match < matchCount; match++) {
+    const half = match < halfMatchCount ? 0 : 1;
+    const firstSide = Math.random() < 0.5 ? 0 : 1;
+    positionsByHalf[half].push(match * 2 + firstSide);
+    if (fullMatches.has(match)) positionsByHalf[half].push(match * 2 + (1 - firstSide));
   }
 
-  for (const entrant of shuffle(singles)) {
-    const preferred = Math.random() < 0.5 ? topSlots : bottomSlots;
-    placeEntrant(entrant, preferred);
+  const bracketPositions: Array<Entrant | null> = Array(size).fill(null);
+  const available = positionsByHalf.map((positions) => shuffle(positions));
+
+  const putInHalf = (entrant: Entrant, half: 0 | 1) => {
+    const position = available[half].pop();
+    if (position == null) throw new Error("Posisi bracket tidak mencukupi.");
+    bracketPositions[position] = entrant;
+  };
+
+  // A two-slot registration is guaranteed one place in each bracket half.
+  for (const group of duplicateGroups) {
+    const firstHalf: 0 | 1 = Math.random() < 0.5 ? 0 : 1;
+    putInHalf(group[0], firstHalf);
+    putInHalf(group[1], firstHalf === 0 ? 1 : 0);
+  }
+
+  for (const entrant of singles) {
+    const possibleHalves = ([0, 1] as const).filter((half) => available[half].length > 0);
+    const half = possibleHalves[Math.floor(Math.random() * possibleHalves.length)];
+    putInHalf(entrant, half);
   }
 
   const seeded: Array<Entrant | null> = Array(size).fill(null);
-  for (let slot = 0; slot < matches.length; slot++) {
-    const seedA = order[slot * 2] - 1;
-    const seedB = order[slot * 2 + 1] - 1;
-    seeded[seedA] = matches[slot].team1;
-    seeded[seedB] = matches[slot].team2;
+  for (let position = 0; position < size; position++) {
+    seeded[order[position] - 1] = bracketPositions[position];
   }
 
   return seeded;
@@ -607,8 +581,6 @@ export async function swapTeams(
     const b = matches.find((m) => m.id === matchBId);
     if (!a || !b)
       return { ok: false, message: "Posisi tim tidak ditemukan." };
-    if (a.round !== b.round)
-      return { ok: false, message: "Penukaran hanya bisa dilakukan dalam ronde yang sama." };
 
     const getTeam = (m: M, side: 1 | 2) =>
       side === 1
@@ -629,11 +601,14 @@ export async function swapTeams(
     setTeam(a, sideA, tb);
     setTeam(b, sideB, ta);
 
-    if (a.round === 1) {
+    if (a.round === 1 && b.round === 1) {
       recompute(matches);
     } else {
+      // Keep both manually selected destinations intact. Only rounds after the
+      // furthest edited round depend on these positions and must be cleared.
+      const lastEditedRound = Math.max(a.round, b.round);
       for (const m of matches) {
-        if (m.round <= a.round) continue;
+        if (m.round <= lastEditedRound) continue;
         m.team1Id = null;
         m.team2Id = null;
         m.team1Name = null;
