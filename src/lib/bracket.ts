@@ -73,7 +73,7 @@ function expandBracketEntrants(
       entrants.push({
         registrationId: team.id,
         displayName:
-          totalSlots > 1 ? `${team.name} (${i + 1})` : team.name,
+          totalSlots > 1 ? `${team.name} (${String.fromCharCode(65 + i)})` : team.name,
       });
     }
   }
@@ -155,7 +155,7 @@ function buildSeededEntries(
 
 function stripSlotSuffix(name: string | null): string | null {
   if (!name) return name;
-  return name.replace(/\s\(\d+\)$/, "");
+  return name.replace(/\s\([A-B1-2]\)$/, "");
 }
 
 // Minimal in-memory shape used during recompute (subset of BracketMatch, mutable).
