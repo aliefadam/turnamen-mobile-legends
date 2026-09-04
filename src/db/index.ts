@@ -1,17 +1,16 @@
 import { drizzle } from "drizzle-orm/node-postgres";
+import { getConnectionString } from "@netlify/database";
 import { Pool } from "pg";
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
-}
+// Netlify Database injects the correct connection for Functions, previews, and
+// local `netlify dev`. This deliberately has no legacy database fallback.
+const databaseUrl = getConnectionString();
 
 const globalForDb = globalThis as typeof globalThis & {
   __arenaNextJsPostgresqlPool?: Pool;
 };
 
-// Local Postgres doesn't use SSL; hosted providers like Supabase require it.
+// Local Postgres doesn't use SSL; Netlify Database connections do.
 const isLocal =
   databaseUrl.includes("localhost") || databaseUrl.includes("127.0.0.1");
 

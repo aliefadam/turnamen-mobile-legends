@@ -38,11 +38,13 @@ type FormData = z.infer<typeof formSchema>;
 const defaultPlayer = { name: "", mlId: "", server: "" };
 
 export default function RegistrationForm({
-  seasonName,
+  eventSlug,
   registrationOpen,
+  allowTwoSlots,
 }: {
-  seasonName: string | null;
+  eventSlug: string;
   registrationOpen: boolean;
+  allowTwoSlots: boolean;
 }) {
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -125,7 +127,7 @@ export default function RegistrationForm({
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(
-          `/api/register/check-team?name=${encodeURIComponent(name)}`,
+          `/api/register/check-team?event=${encodeURIComponent(eventSlug)}&name=${encodeURIComponent(name)}`,
           { signal: controller.signal },
         );
         const json = await res.json();
@@ -141,11 +143,11 @@ export default function RegistrationForm({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [teamName]);
+  }, [teamName, eventSlug]);
 
   const nextStep = async () => {
     if (!registrationOpen) {
-      toast.error("Pendaftaran untuk season aktif sedang ditutup.");
+      toast.error("Pendaftaran event ini sedang ditutup.");
       return;
     }
 
@@ -170,7 +172,7 @@ export default function RegistrationForm({
 
   const onSubmit = async (data: FormData) => {
     if (!registrationOpen) {
-      toast.error("Pendaftaran untuk season aktif sedang ditutup.");
+      toast.error("Pendaftaran event ini sedang ditutup.");
       return;
     }
 
@@ -180,7 +182,7 @@ export default function RegistrationForm({
       formData.append("payload", JSON.stringify(data));
       if (proofFile) formData.append("proof", proofFile);
 
-      const res = await fetch("/api/register", {
+      const res = await fetch(`/api/register?event=${encodeURIComponent(eventSlug)}`, {
         method: "POST",
         body: formData,
       });
@@ -271,24 +273,10 @@ export default function RegistrationForm({
 
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="p-6">
-            {/* {seasonName && (
-              <div className="mb-5 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-orange-500">
-                  Season Aktif
-                </p>
-                <p className="text-sm font-semibold text-gray-800">
-                  {seasonName}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Form ini akan mendaftarkan tim ke season yang sedang aktif.
-                </p>
-              </div>
-            )} */}
-
             {!registrationOpen && (
               <div className="mb-5 rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
                 <p className="text-sm font-semibold text-red-600">
-                  Pendaftaran untuk season ini sedang ditutup oleh panitia.
+                  Pendaftaran event ini sedang ditutup oleh panitia.
                 </p>
               </div>
             )}
@@ -409,10 +397,10 @@ export default function RegistrationForm({
                       Jumlah Slot <span className="text-orange-500">*</span>
                     </label>
                     <p className="text-xs text-gray-500 mb-3">
-                      Setiap slot seharga 50K (maksimal 2 slot)
+                      Setiap slot seharga 50K {allowTwoSlots ? "(maksimal 2 slot)" : "(maksimal 1 slot)"}
                     </p>
                     <div className="grid grid-cols-2 gap-3">
-                      {[1, 2].map((n) => (
+                      {(allowTwoSlots ? [1, 2] : [1]).map((n) => (
                         <button
                           type="button"
                           key={n}

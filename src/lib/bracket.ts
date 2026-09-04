@@ -1,5 +1,4 @@
 import type { BracketMatch } from "@/db/schema";
-import { getActiveSeason } from "./seasons";
 
 // ---------- Types exposed to the UI ----------
 export type BracketRound = {
@@ -262,9 +261,8 @@ function recompute(matches: M[]): M[] {
 }
 
 // ---------- DB access ----------
-async function loadMatches(seasonId?: number | null): Promise<M[]> {
-  const season = seasonId ? { id: seasonId } : await getActiveSeason();
-  if (!season) return [];
+async function loadMatches(eventId: number): Promise<M[]> {
+  if (!Number.isFinite(eventId)) return [];
 
   const { db } = await import("@/db");
   const { bracketMatches } = await import("@/db/schema");
@@ -272,7 +270,7 @@ async function loadMatches(seasonId?: number | null): Promise<M[]> {
   const rows = await db
     .select()
     .from(bracketMatches)
-    .where(eq(bracketMatches.seasonId, season.id))
+    .where(eq(bracketMatches.eventId, eventId))
     .orderBy(asc(bracketMatches.round), asc(bracketMatches.slot));
   return rows as M[];
 }
@@ -300,9 +298,9 @@ async function persist(matches: M[]): Promise<void> {
 }
 
 // ---------- Public API ----------
-export async function getBracket(seasonId?: number | null): Promise<BracketData> {
+export async function getBracket(eventId: number): Promise<BracketData> {
   try {
-    const matches = await loadMatches(seasonId);
+    const matches = await loadMatches(eventId);
     if (matches.length === 0) {
       return { exists: false, dbError: false, started: false, totalRounds: 0, rounds: [], champion: null };
     }
@@ -350,12 +348,9 @@ export async function getBracket(seasonId?: number | null): Promise<BracketData>
   }
 }
 
-export async function generateBracket(): Promise<{ ok: boolean; message?: string }> {
+export async function generateBracket(eventId: number): Promise<{ ok: boolean; message?: string }> {
   try {
-    const season = await getActiveSeason();
-    if (!season) {
-      return { ok: false, message: "Belum ada season aktif." };
-    }
+    if (!Number.isFinite(eventId)) return { ok: false, message: "Event tidak valid." };
 
     const { db } = await import("@/db");
     const { registrations, bracketMatches } = await import("@/db/schema");
@@ -371,7 +366,7 @@ export async function generateBracket(): Promise<{ ok: boolean; message?: string
       .where(
         and(
           eq(registrations.status, "confirmed"),
-          eq(registrations.seasonId, season.id)
+          eq(registrations.eventId, eventId)
         )
       )
       .orderBy(asc(registrations.createdAt));
@@ -394,7 +389,7 @@ export async function generateBracket(): Promise<{ ok: boolean; message?: string
     const seedToTeam = buildSeededEntries(entrants, size, order);
 
     // Wipe existing bracket.
-    await db.delete(bracketMatches).where(eq(bracketMatches.seasonId, season.id));
+    await db.delete(bracketMatches).where(eq(bracketMatches.eventId, eventId));
 
     // Build round 1 rows.
     const rows: {
@@ -430,11 +425,11 @@ export async function generateBracket(): Promise<{ ok: boolean; message?: string
     }
 
     await db.insert(bracketMatches).values(
-      rows.map((r) => ({ ...r, seasonId: season.id, bestOf: 1 }))
+      rows.map((r) => ({ ...r, eventId, bestOf: 1 }))
     );
 
     // Resolve byes → fill round 2, then persist.
-    const matches = await loadMatches();
+    const matches = await loadMatches(eventId);
     recompute(matches);
     await persist(matches);
 
@@ -445,15 +440,12 @@ export async function generateBracket(): Promise<{ ok: boolean; message?: string
   }
 }
 
-export async function resetBracket(): Promise<{ ok: boolean }> {
+export async function resetBracket(eventId: number): Promise<{ ok: boolean }> {
   try {
-    const season = await getActiveSeason();
-    if (!season) return { ok: true };
-
     const { db } = await import("@/db");
     const { bracketMatches } = await import("@/db/schema");
     const { eq } = await import("drizzle-orm");
-    await db.delete(bracketMatches).where(eq(bracketMatches.seasonId, season.id));
+    await db.delete(bracketMatches).where(eq(bracketMatches.eventId, eventId));
     return { ok: true };
   } catch (error) {
     console.error("resetBracket failed:", error);
@@ -462,12 +454,13 @@ export async function resetBracket(): Promise<{ ok: boolean }> {
 }
 
 export async function setMatchResult(
+  eventId: number,
   matchId: number,
   score1: number,
   score2: number
 ): Promise<{ ok: boolean; message?: string }> {
   try {
-    const matches = await loadMatches();
+    const matches = await loadMatches(eventId);
     const m = matches.find((x) => x.id === matchId);
     if (!m) return { ok: false, message: "Match tidak ditemukan." };
     if (m.team1Name == null || m.team2Name == null)
@@ -497,11 +490,12 @@ export async function setMatchResult(
 }
 
 export async function setMatchPlayed(
+  eventId: number,
   matchId: number,
   played: boolean
 ): Promise<{ ok: boolean; message?: string }> {
   try {
-    const matches = await loadMatches();
+    const matches = await loadMatches(eventId);
     const m = matches.find((x) => x.id === matchId);
     if (!m) return { ok: false, message: "Match tidak ditemukan." };
     if (m.team1Name == null || m.team2Name == null)
@@ -524,13 +518,14 @@ export async function setMatchPlayed(
 }
 
 export async function setRoundBestOf(
+  eventId: number,
   round: number,
   bestOf: number
 ): Promise<{ ok: boolean; message?: string }> {
   if (![1, 3, 5, 7].includes(bestOf))
     return { ok: false, message: "Best-of tidak valid." };
   try {
-    const matches = await loadMatches();
+    const matches = await loadMatches(eventId);
     const need = Math.ceil(bestOf / 2);
     for (const m of matches) {
       if (m.round !== round) continue;
@@ -566,13 +561,14 @@ export async function setRoundBestOf(
 }
 
 export async function swapTeams(
+  eventId: number,
   matchAId: number,
   sideA: 1 | 2,
   matchBId: number,
   sideB: 1 | 2
 ): Promise<{ ok: boolean; message?: string }> {
   try {
-    const matches = await loadMatches();
+    const matches = await loadMatches(eventId);
     const started = matches.some((m) => m.played || m.score1 > 0 || m.score2 > 0);
     if (started)
       return { ok: false, message: "Tidak bisa mengatur posisi setelah pertandingan dimulai." };

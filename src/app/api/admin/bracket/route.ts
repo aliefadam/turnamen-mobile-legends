@@ -17,23 +17,25 @@ async function requireSuperadmin() {
   return { admin };
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const guard = await requireSuperadmin();
   if ("error" in guard)
     return NextResponse.json({ success: false, message: guard.error }, { status: guard.status });
 
-  const result = await generateBracket();
+  const eventId = Number(req.nextUrl.searchParams.get("eventId"));
+  const result = await generateBracket(eventId);
   if (!result.ok)
     return NextResponse.json({ success: false, message: result.message }, { status: 400 });
   return NextResponse.json({ success: true });
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
   const guard = await requireSuperadmin();
   if ("error" in guard)
     return NextResponse.json({ success: false, message: guard.error }, { status: guard.status });
 
-  await resetBracket();
+  const eventId = Number(req.nextUrl.searchParams.get("eventId"));
+  await resetBracket(eventId);
   return NextResponse.json({ success: true });
 }
 
@@ -54,6 +56,7 @@ export async function PATCH(req: NextRequest) {
     sideA?: number;
     matchBId?: number;
     sideB?: number;
+    eventId?: number;
   };
   try {
     body = await req.json();
@@ -62,22 +65,25 @@ export async function PATCH(req: NextRequest) {
   }
 
   let result: { ok: boolean; message?: string };
+  const eventId = Number(body.eventId);
   switch (body.action) {
     case "result":
       result = await setMatchResult(
+        eventId,
         Number(body.matchId),
         Number(body.score1),
         Number(body.score2)
       );
       break;
     case "played":
-      result = await setMatchPlayed(Number(body.matchId), Boolean(body.played));
+      result = await setMatchPlayed(eventId, Number(body.matchId), Boolean(body.played));
       break;
     case "roundBo":
-      result = await setRoundBestOf(Number(body.round), Number(body.bestOf));
+      result = await setRoundBestOf(eventId, Number(body.round), Number(body.bestOf));
       break;
     case "swap":
       result = await swapTeams(
+        eventId,
         Number(body.matchAId),
         (body.sideA === 2 ? 2 : 1) as 1 | 2,
         Number(body.matchBId),

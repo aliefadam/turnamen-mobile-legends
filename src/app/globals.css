@@ -119,10 +119,27 @@ body {
 
 /* Input focus styles */
 .input-field {
+  width: 100%;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+  padding: 0.75rem 1rem;
   transition: all 0.3s ease;
   border: 1.5px solid #e5e7eb;
   outline: none;
 }
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  padding: 0.55rem 0.8rem;
+  color: #4b5563;
+  font-size: 0.78rem;
+  font-weight: 700;
+  transition: all 160ms ease;
+}
+.action:hover { border-color: #fed7aa; background: #fff7ed; color: #ea580c; }
 
 .input-field:focus {
   border-color: #f59e0b;

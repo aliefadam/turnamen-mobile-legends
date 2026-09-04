@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { registrations } from "@/db/schema";
-import { getActiveSeason } from "@/lib/seasons";
+import { getEventBySlug } from "@/lib/events";
 import { z } from "zod";
 import { and, count, eq, sql } from "drizzle-orm";
 
@@ -31,16 +31,16 @@ const registrationSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const season = await getActiveSeason();
-    if (!season) {
+    const event = await getEventBySlug(req.nextUrl.searchParams.get("event") ?? "");
+    if (!event) {
       return NextResponse.json(
-        { success: false, message: "Belum ada season aktif untuk pendaftaran." },
+        { success: false, message: "Event tidak ditemukan." },
         { status: 400 }
       );
     }
-    if (!season.registrationOpen) {
+    if (!event.registrationOpen) {
       return NextResponse.json(
-        { success: false, message: "Pendaftaran untuk season ini sedang ditutup." },
+        { success: false, message: "Pendaftaran event ini sedang ditutup." },
         { status: 400 }
       );
     }
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       .from(registrations)
       .where(
         and(
-          eq(registrations.seasonId, season.id),
+          eq(registrations.eventId, event.id),
           sql`lower(${registrations.teamName}) = lower(${data.teamName})`
         )
       );
@@ -94,12 +94,15 @@ export async function POST(req: NextRequest) {
     const totalSlots = await db
       .select({ slot: registrations.slot })
       .from(registrations)
-      .where(eq(registrations.seasonId, season.id));
+      .where(eq(registrations.eventId, event.id));
     const total = totalSlots.reduce(
       (sum, row) => sum + Math.max(1, Number(row.slot ?? 1)),
       0
     );
-    if (total + data.slot > season.maxSlots) {
+    if (data.slot === 2 && !event.allowTwoSlots) {
+      return NextResponse.json({ success: false, message: "Event ini hanya mengizinkan 1 slot per tim." }, { status: 400 });
+    }
+    if (total + data.slot > event.maxSlots) {
       return NextResponse.json(
         { success: false, message: "Slot pendaftaran sudah penuh." },
         { status: 400 }
@@ -113,14 +116,14 @@ export async function POST(req: NextRequest) {
     // Upload payment proof to Supabase Storage (no-op if storage not configured).
     let paymentProofPath: string | null = null;
     if (proofFile) {
-      const { uploadPaymentProof } = await import("@/lib/supabase");
+      const { uploadPaymentProof } = await import("@/lib/netlify-storage");
       paymentProofPath = await uploadPaymentProof(proofFile, data.teamName);
     }
 
     const newReg = await db
       .insert(registrations)
       .values({
-        seasonId: season.id,
+        eventId: event.id,
         paymentProofPath,
         status: "pending",
         teamName: data.teamName,
@@ -176,21 +179,21 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const season = await getActiveSeason();
-    if (!season) {
-      return NextResponse.json({ success: true, total: 0, season: null });
+    const event = await getEventBySlug(req.nextUrl.searchParams.get("event") ?? "");
+    if (!event) {
+      return NextResponse.json({ success: true, total: 0, event: null });
     }
     const data = await db
       .select({ slot: registrations.slot })
       .from(registrations)
-      .where(eq(registrations.seasonId, season.id));
+      .where(eq(registrations.eventId, event.id));
     const total = data.reduce(
       (sum, row) => sum + Math.max(1, Number(row.slot ?? 1)),
       0
     );
-    return NextResponse.json({ success: true, total, season });
+    return NextResponse.json({ success: true, total, event });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ success: false, total: 0 }, { status: 500 });

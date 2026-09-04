@@ -3,11 +3,17 @@
 import { motion } from "framer-motion";
 
 export default function HeroSection({
-  seasonName,
+  eventName,
   registrationOpen,
+  eventDate,
+  location,
+  prizePool,
 }: {
-  seasonName: string | null;
+  eventName: string;
   registrationOpen: boolean;
+  eventDate: Date | string;
+  location: string;
+  prizePool: number;
 }) {
   return (
     <section className="relative w-full overflow-hidden bg-white">
@@ -40,14 +46,14 @@ export default function HeroSection({
           </span>
         </motion.div>
 
-        {seasonName && (
+        {eventName && (
           <motion.p
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.05 }}
             className="text-sm font-bold text-orange-600 mb-3"
           >
-            {seasonName}
+            {eventName}
           </motion.p>
         )}
 
@@ -73,10 +79,10 @@ export default function HeroSection({
           className="inline-flex flex-wrap items-center justify-center gap-2 text-gray-500 text-sm sm:text-base font-medium mb-8"
         >
           <i className="fi fi-rr-marker text-orange-500" />
-          Warkop Sippo Wiyung
+          {location}
           <span className="text-orange-200">•</span>
           <i className="fi fi-rr-calendar text-orange-500" />
-          9 Agustus 2026
+          {new Date(eventDate).toLocaleString("id-ID", { dateStyle: "long", timeStyle: "short" })} WIB
         </motion.p>
 
         {/* Prize Pool Highlight */}
@@ -94,7 +100,7 @@ export default function HeroSection({
               </p>
             </div>
             <p className="text-white text-3xl sm:text-4xl font-black">
-              ±Rp 1.500.000
+              Rp {prizePool.toLocaleString("id-ID")}
             </p>
           </div>
         </motion.div>

@@ -3,7 +3,6 @@ import { db } from "@/db";
 import { registrations } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getAdminInfo } from "@/lib/admin-session";
-import { getActiveSeason } from "@/lib/seasons";
 
 async function requireSuperadmin() {
   const admin = await getAdminInfo();
@@ -44,16 +43,10 @@ export async function PATCH(
   }
 
   try {
-    const season = await getActiveSeason();
-    if (!season) {
-      return NextResponse.json({ success: false, message: "Belum ada season aktif" }, { status: 400 });
-    }
-
-    const { and } = await import("drizzle-orm");
     const rows = await db
       .select()
       .from(registrations)
-      .where(and(eq(registrations.id, id), eq(registrations.seasonId, season.id)))
+      .where(eq(registrations.id, id))
       .limit(1);
     const reg = rows[0];
     if (!reg) {
@@ -91,7 +84,7 @@ export async function PATCH(
     await db
       .update(registrations)
       .set({ attendance, attended })
-      .where(and(eq(registrations.id, id), eq(registrations.seasonId, season.id)));
+      .where(eq(registrations.id, id));
 
     return NextResponse.json({ success: true, attended, attendance });
   } catch (error) {

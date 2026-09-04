@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { registrations } from "@/db/schema";
-import { getActiveSeason } from "@/lib/seasons";
+import { getEventBySlug } from "@/lib/events";
 import { and, count, eq, sql } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
@@ -12,15 +12,15 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const season = await getActiveSeason();
-    if (!season) return NextResponse.json({ available: null });
+    const event = await getEventBySlug(req.nextUrl.searchParams.get("event") ?? "");
+    if (!event) return NextResponse.json({ available: null });
 
     const rows = await db
       .select({ n: count() })
       .from(registrations)
       .where(
         and(
-          eq(registrations.seasonId, season.id),
+          eq(registrations.eventId, event.id),
           sql`lower(${registrations.teamName}) = lower(${name})`
         )
       );

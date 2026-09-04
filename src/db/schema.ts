@@ -7,26 +7,29 @@ import {
   integer,
   boolean,
   jsonb,
+  bigint,
 } from "drizzle-orm/pg-core";
 
-export const seasons = pgTable("seasons", {
+export const events = pgTable("events", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 120 }).notNull(),
   slug: varchar("slug", { length: 140 }).notNull().unique(),
-  isActive: boolean("is_active").notNull().default(false),
   registrationOpen: boolean("registration_open").notNull().default(true),
   maxSlots: integer("max_slots").notNull().default(100),
+  eventDate: timestamp("event_date").notNull(),
+  location: varchar("location", { length: 255 }).notNull(),
+  prizePool: bigint("prize_pool", { mode: "number" }).notNull().default(0),
+  allowTwoSlots: boolean("allow_two_slots").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export type Season = typeof seasons.$inferSelect;
-export type NewSeason = typeof seasons.$inferInsert;
+export type Event = typeof events.$inferSelect;
+export type NewEvent = typeof events.$inferInsert;
 
 export const registrations = pgTable("registrations", {
   id: serial("id").primaryKey(),
-  seasonId: integer("season_id").references(() => seasons.id, {
-    onDelete: "set null",
-  }),
+  eventId: integer("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
   teamName: varchar("team_name", { length: 100 }).notNull(),
   leaderName: varchar("leader_name", { length: 100 }).notNull(),
   leaderWhatsapp: varchar("leader_whatsapp", { length: 20 }).notNull(),
@@ -54,7 +57,7 @@ export const registrations = pgTable("registrations", {
   sub2MlId: varchar("sub2_ml_id", { length: 50 }),
   sub2Server: varchar("sub2_server", { length: 50 }),
   slot: integer("slot").notNull().default(1),
-  // Storage object path of the uploaded payment proof (Supabase Storage)
+  // Object key of the uploaded payment proof in Netlify Blobs.
   paymentProofPath: text("payment_proof_path"),
   // Registration status: "pending" | "confirmed"
   status: varchar("status", { length: 20 }).notNull().default("pending"),
@@ -85,9 +88,7 @@ export type NewAdmin = typeof admins.$inferInsert;
 // Single-elimination bracket matches (one active bracket).
 export const bracketMatches = pgTable("bracket_matches", {
   id: serial("id").primaryKey(),
-  seasonId: integer("season_id").references(() => seasons.id, {
-    onDelete: "set null",
-  }),
+  eventId: integer("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
   round: integer("round").notNull(), // 1 = first round
   slot: integer("slot").notNull(), // 0-based index within the round
   team1Id: integer("team1_id"),

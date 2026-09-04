@@ -36,8 +36,10 @@ type FormData = z.infer<typeof schema>;
 
 export default function EditPesertaForm({
   registration,
+  backPath,
 }: {
   registration: RegistrationWithProof;
+  backPath: string;
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -96,7 +98,7 @@ export default function EditPesertaForm({
       const json = await res.json();
       if (json.success) {
         toast.success("Data berhasil diperbarui");
-        router.push("/admin/peserta");
+        router.push(backPath);
         router.refresh();
       } else {
         toast.error(json.message || "Gagal menyimpan");
@@ -112,7 +114,7 @@ export default function EditPesertaForm({
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Link
-          href="/admin/peserta"
+          href={backPath}
           className="w-9 h-9 rounded-lg border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-600 transition-colors"
           aria-label="Kembali"
         >
@@ -237,7 +239,7 @@ export default function EditPesertaForm({
         {/* Actions */}
         <div className="flex gap-3 justify-end">
           <Link
-            href="/admin/peserta"
+            href={backPath}
             className="px-6 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-colors"
           >
             Batal

@@ -13,10 +13,14 @@ export default function BracketManager({
   bracket,
   isSuperadmin,
   confirmedCount,
+  eventId,
+  publicSlug,
 }: {
   bracket: BracketData;
   isSuperadmin: boolean;
   confirmedCount: number;
+  eventId: number;
+  publicSlug: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -35,10 +39,12 @@ export default function BracketManager({
     setBusy(true);
     setBusyAction(action ?? null);
     try {
-      const res = await fetch("/api/admin/bracket", {
+      const url = `/api/admin/bracket?eventId=${eventId}`;
+      const payload = body && typeof body === "object" ? { ...body, eventId } : body;
+      const res = await fetch(url, {
         method,
         headers: body ? { "Content-Type": "application/json" } : undefined,
-        body: body ? JSON.stringify(body) : undefined,
+        body: payload ? JSON.stringify(payload) : undefined,
       });
       const json = await res.json();
       if (json.success) {
@@ -120,7 +126,7 @@ export default function BracketManager({
   if (!bracket.exists) {
     return (
       <div className="space-y-6">
-        <Header isSuperadmin={isSuperadmin} />
+        <Header isSuperadmin={isSuperadmin} publicSlug={publicSlug} />
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-16 px-6 text-center">
           <div className="w-16 h-16 rounded-2xl bg-gray-50 mx-auto flex items-center justify-center mb-4">
             <i className="fi fi-rr-sitemap text-gray-300 text-2xl" />
@@ -162,7 +168,7 @@ export default function BracketManager({
 
   return (
     <div className="space-y-6">
-      <Header isSuperadmin={isSuperadmin} />
+      <Header isSuperadmin={isSuperadmin} publicSlug={publicSlug} />
 
       {isSuperadmin && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex flex-wrap items-center gap-2">
@@ -258,7 +264,7 @@ export default function BracketManager({
   );
 }
 
-function Header({ isSuperadmin }: { isSuperadmin: boolean }) {
+function Header({ isSuperadmin, publicSlug }: { isSuperadmin: boolean; publicSlug: string }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -268,7 +274,7 @@ function Header({ isSuperadmin }: { isSuperadmin: boolean }) {
         </p>
       </div>
       <Link
-        href="/bracket"
+        href={`/event/${publicSlug}/bracket`}
         target="_blank"
         className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50"
       >

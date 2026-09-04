@@ -1,0 +1,1 @@
+ALTER TABLE "registrations" ADD COLUMN "payment_proof_path" text;

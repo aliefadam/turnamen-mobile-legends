@@ -96,9 +96,11 @@ function waLink(phone: string) {
 export default function PesertaTable({
   data,
   isSuperadmin = false,
+  eventId,
 }: {
   data: RegistrationWithProof[];
   isSuperadmin?: boolean;
+  eventId: number;
 }) {
   const [rows, setRows] = useState(data);
   const [query, setQuery] = useState("");
@@ -461,7 +463,7 @@ export default function PesertaTable({
                               }
                             />
                             <Link
-                              href={`/admin/peserta/${r.id}/edit`}
+                              href={`/admin/events/${eventId}/participants/${r.id}/edit`}
                               title="Edit"
                               className="w-8 h-8 rounded-lg text-gray-500 hover:bg-blue-50 hover:text-blue-600 flex items-center justify-center transition-colors"
                             >
@@ -558,7 +560,7 @@ export default function PesertaTable({
                         size="lg"
                       />
                       <Link
-                        href={`/admin/peserta/${r.id}/edit`}
+                        href={`/admin/events/${eventId}/participants/${r.id}/edit`}
                         aria-label="Edit peserta"
                         title="Edit"
                         className="w-11 flex-shrink-0 flex items-center justify-center rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 active:scale-95 transition-all"
